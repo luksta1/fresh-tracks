@@ -32,7 +32,8 @@ Then open http://localhost:8000. The app is ES modules, so it needs a server; op
 
 Covers scoring, the weekend and SNOTEL math, URL hashes, the HTML views (including escaping of
 outside text), parsing against saved real API responses in `test/fixtures/`, and the committed
-data: every resort well-formed, matched in `resort-meta.js`, and with a trails file near it.
+data: every resort well-formed, matched in `resort-meta.js`, with a trails file near it, and with
+après picks in `apres.js`.
 
 ## Layout
 

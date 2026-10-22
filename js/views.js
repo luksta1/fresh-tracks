@@ -4,7 +4,7 @@ import { PASS_FILTERS, RUN_COLORS, RUNS, TIERS, TODAY, WINDOWS } from "./config.
 import { blurb, confidence, tierOf } from "./score.js";
 import { esc, fmt, ft } from "./util.js";
 
-export const INCH = `<span class="inch">″</span>`;
+const INCH = `<span class="inch">″</span>`;
 const amt = n => `<span class="amt">${fmt(n)}${INCH}</span>`;
 const dateOf = d => new Date(d.date + "T12:00:00");
 const dow = d => dateOf(d).toLocaleDateString("en-US", { weekday: "short" });
@@ -17,7 +17,7 @@ export function glyph(t, size = 14, color = t.color) {
 }
 
 // Tier pill: the tier's own color as the fill, with a dark glyph on it.
-export const tierPill = t =>
+const tierPill = t =>
   `<span class="tier${t.hollow ? " hollow" : ""}" style="--c:${t.color}">${glyph(t, 10, t.hollow ? t.color : "#0e1622")}${t.name}</span>`;
 
 export function passPill(r) {
@@ -27,7 +27,7 @@ export function passPill(r) {
   return `<span class="pass ${epic ? "pass-epic" : "pass-ikon"}">${label}</span>`;
 }
 
-export function confBadge(st) {
+function confBadge(st) {
   const c = confidence(st);
   if (!c) return "";
   return `<span class="conf conf-${c.c}" title="Main model ${fmt(st.snow)}″, ECMWF ${fmt(st.snowAlt)}″">${c.t}<span class="conf-alt">ECMWF ${fmt(st.snowAlt)}″</span></span>`;
@@ -107,7 +107,7 @@ export function controlsHtml(state, regions) {
 /* ---------- ranked list ---------- */
 
 // A ranked row. The active row also shows its day-by-day strip; `hot` is the days being scored.
-export function rowHtml(r, s, rank, active, extra = "", hot = []) {
+function rowHtml(r, s, rank, active, extra = "", hot = []) {
   const t = tierOf(s.score);
   const meta = `${r.st} · ${t.name} · avg ${Math.round(s.avgT)}°F · wind ${Math.round(s.wind)} mph`;
   return `<li><button type="button" class="row${active ? " active" : ""}" data-id="${r.id}" aria-expanded="${active}">
@@ -207,7 +207,7 @@ export function weekendHeadHtml(days, idx) {
 // Top three as cards, the rest as a list. Returns {picks, rest} markup.
 export function weekendHtml(rows, dayIdx, activeId) {
   const quiet = !rows.length || rows[0].s.score < 5;
-  const cards = rows.slice(0, 3).map(({ r, s }, k) => {
+  const cards = quiet ? "" : rows.slice(0, 3).map(({ r, s }, k) => {
     const t = tierOf(s.score);
     const cells = dayIdx.map(i => {
       const d = r.days[i];
@@ -268,7 +268,7 @@ export function popupHtml(r, s, showObs) {
 
 // Google Maps search for a bar by name, resort and state. It always resolves, unlike a guessed
 // website URL; the "where" labels are wayfinding phrases that would muddy the search.
-export const mapsLink = (name, r) =>
+const mapsLink = (name, r) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${r.name}, ${r.st}`)}`;
 
 // Après picks from apres.js, which people edit by hand, so everything is escaped.

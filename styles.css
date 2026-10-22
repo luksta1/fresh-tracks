@@ -13,6 +13,11 @@
   --accent-hi: #e4ff9a;
   --blue: #3b8bff;
   --green: #2fd07a;
+  /* trail-mix bar: difficulty, in trail-sign colors */
+  --mix-green: var(--green);
+  --mix-blue: var(--blue);
+  --mix-black: var(--text);
+  --mix-double: var(--accent);
   --bar-h: 76px;
   --gutter: 40px;
   --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
@@ -34,6 +39,8 @@ button { cursor: pointer; }
 
 /* ---------- top bar ---------- */
 .bar {
+  position: relative;   /* anchors the loading bar */
+  overflow: hidden;
   min-height: var(--bar-h);
   display: flex;
   flex-wrap: wrap;
@@ -97,7 +104,6 @@ button { cursor: pointer; }
 
 /* ---------- loading ---------- */
 /* A slim bar slides along the bottom of the header and the status dot pulses while anything loads. */
-.bar { position: relative; overflow: hidden; }
 .bar::after {
   content: "";
   position: absolute;
@@ -250,7 +256,6 @@ body.busy .dot { animation: pulse .8s ease-in-out infinite alternate; }
 .hero.quiet .big { color: var(--dim); }
 
 /* ---------- mountain facts + trail mix ---------- */
-:root { --mix-green: var(--green); --mix-blue: var(--blue); --mix-black: var(--text); --mix-double: var(--accent); }
 .mountain { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
 .facts { font: 400 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .mix { display: flex; flex-direction: column; gap: 6px; }
