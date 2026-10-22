@@ -266,18 +266,18 @@ export function popupHtml(r, s, showObs) {
     <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${tierOf(s.score).name}</em></div>${obs}${apresHtml(r)}</div>`;
 }
 
-// Google Maps search for a bar: always resolves, unlike a guessed website URL.
-export const mapsLink = (name, where) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${where}`)}`;
+// Google Maps search for a bar by name, resort and state. It always resolves, unlike a guessed
+// website URL; the "where" labels are wayfinding phrases that would muddy the search.
+export const mapsLink = (name, r) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${r.name}, ${r.st}`)}`;
 
-// Après picks from apres.js, which people edit by hand, so everything is escaped. Without a
-// "where", the Maps search uses the resort and state.
+// Après picks from apres.js, which people edit by hand, so everything is escaped.
 function apresHtml(r) {
   if (!r.apres?.length) return `<div class="pop-apres"><div class="pop-label">Après</div><p class="pop-none">No picks yet. Add some in apres.js.</p></div>`;
   return `<div class="pop-apres"><div class="pop-label">Après</div><ol>${r.apres.slice(0, 3).map(([name, where, note]) => {
     const detail = [where, note].filter(Boolean).map(esc).join(" · ");
     return `<li>
-      <a href="${mapsLink(name, where || `${r.name}, ${r.st}`)}" target="_blank" rel="noopener">${esc(name)}</a>${detail ? `
+      <a href="${mapsLink(name, r)}" target="_blank" rel="noopener">${esc(name)}</a>${detail ? `
       <small>${detail}</small>` : ""}
     </li>`;
   }).join("")}</ol></div>`;

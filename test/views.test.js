@@ -134,7 +134,7 @@ test("popupHtml: après picks with escaped names and Maps links", () => {
   const r = resort({ apres: [["Mangy Moose", "Teton Village", "3:30 or no table"], [`<b>Bad"Bar`, "Town"]] });
   const html = popupHtml(r, st(), false);
   assert.match(html, /class="pop-label">Après/);
-  assert.match(html, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Mangy%20Moose%2C%20Teton%20Village" target="_blank" rel="noopener">Mangy Moose<\/a>/);
+  assert.match(html, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Mangy%20Moose%2C%20Big%20Sky%2C%20MT" target="_blank" rel="noopener">Mangy Moose<\/a>/, "search by name, resort and state, not the wayfinding label");
   assert.match(html, /Teton Village · 3:30 or no table/);
   assert.ok(!html.includes(`<b>Bad"Bar`), "names are escaped");
   assert.match(html, /&lt;b&gt;Bad&quot;Bar/);
@@ -142,6 +142,6 @@ test("popupHtml: après picks with escaped names and Maps links", () => {
   assert.equal((popupHtml(many, st(), false).match(/<li>/g) || []).length, 3, "three at most");
   assert.match(popupHtml(resort({ apres: [] }), st(), false), /No picks yet/);
   const bare = popupHtml(resort({ apres: [["Scissorbills Saloon"]] }), st(), false);
-  assert.match(bare, /query=Scissorbills%20Saloon%2C%20Big%20Sky%2C%20MT"/, "no where: search by resort and state");
+  assert.match(bare, /query=Scissorbills%20Saloon%2C%20Big%20Sky%2C%20MT"/);
   assert.ok(!/<small>/.test(bare.split('class="pop-apres"')[1]), "no empty detail line");
 });

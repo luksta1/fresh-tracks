@@ -499,13 +499,13 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .pop .pop-amt .inch { font-size: 20px; }
 .pop em { font: 500 13px var(--body); font-style: normal; color: var(--muted); align-self: center; }
 .pop .obs { font: 400 11px var(--mono); color: #8fc2ff; margin-top: 4px; }
-.pop-apres { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-2); min-width: 220px; }
+.pop-apres { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-2); min-width: 220px; max-width: 260px; }
 .pop-label { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .pop-apres ol { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .pop-apres a { font: 600 15px/1.2 var(--body); color: var(--text); text-decoration: none; }
 .pop-apres a::after { content: " ↗"; color: var(--muted); font-size: 12px; }
 .pop-apres a:hover { color: var(--accent-hi); }
-.pop-apres small { display: block; margin-top: 2px; font: 400 11px var(--mono); color: var(--muted); text-transform: uppercase; }
+.pop-apres small { display: block; margin-top: 2px; font: 400 12px/1.35 var(--body); color: var(--muted); }
 .pop-none { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
 .legend {
   position: absolute;
