@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fresh Tracks: where the powder is</title>
+  <meta name="description" content="Live snowfall forecasts, a powder score, and a weekend pick for 70 North American ski resorts.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2310252b'/%3E%3Cpath d='M16 5l9 11-9 11-9-11z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="bar">
+    <h1 class="brand">Fresh Tracks</h1>
+    <nav class="tabs" aria-label="Views">
+      <button data-view="now" aria-current="page">Right now</button>
+      <button data-view="weekend">This weekend</button>
+      <button data-view="check">Model check</button>
+    </nav>
+    <div class="status">
+      <span id="status">Loading…</span>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <main id="app" data-view="now">
+    <section id="panel" aria-live="polite">
+      <div id="controls"></div>
+      <div id="content"><p class="note">Loading forecasts…</p></div>
+      <details class="how">
+        <summary>How the powder score works</summary>
+        <p>Each day scores from 0 to 100. Snowfall does most of the work and tops out at 12″ in a day. Cold air adds points, because colder snow is lighter. Calm wind adds a little. Multi-day windows combine the daily scores, so two 6″ days beat one 6″ day but not one 12″ day.</p>
+        <p>Forecasts come from Open-Meteo at about 70% of the way up each mountain. Model check compares the last three days of modeled snow to snow depth gains measured at the nearest SNOTEL station (US only), so you know how far to trust the numbers.</p>
+      </details>
+    </section>
+    <div id="mapwrap">
+      <div id="map"></div>
+      <div id="legend" class="legend"></div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="resorts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,607 @@
+/* Fresh Tracks: powder tracker. No build step, no framework. */
+(() => {
+  "use strict";
+
+  /* ============================================================
+     Config
+     ============================================================ */
+  const METEO = "https://api.open-meteo.com/v1/forecast";
+  const AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
+  const PAST = 7;          // days of history requested
+  const FUTURE = 8;        // days of forecast requested (today included)
+  const TODAY = PAST;      // index of "today" in each resort's days array
+  const FORECAST_TTL = 30 * 60 * 1000;
+  const STATION_TTL = 7 * 24 * 3600 * 1000;
+  const MAX_STATION_KM = 40;
+  const US = new Set(["CO", "UT", "WY", "MT", "ID", "NM", "AZ", "CA", "NV", "OR", "WA", "AK", "VT", "NH", "ME", "NY"]);
+
+  // Score tiers use ski-trail signage: circle, square, diamond, double diamond.
+  const TIERS = [
+    { min: 75, name: "Send it", shape: "diamond", n: 2, color: "#0f1417" },
+    { min: 50, name: "Deep", shape: "diamond", n: 1, color: "#0f1417" },
+    { min: 25, name: "Good", shape: "square", n: 1, color: "#1f6fdb" },
+    { min: 5, name: "Light", shape: "circle", n: 1, color: "#1e9a57" },
+    { min: 0, name: "Quiet", shape: "circle", n: 1, color: "#9aa9b0", hollow: true }
+  ];
+
+  const WINDOWS = {
+    past3: { label: "Past 3 days", idx: [TODAY - 3, TODAY - 2, TODAY - 1] },
+    next3: { label: "Next 3 days", idx: [TODAY, TODAY + 1, TODAY + 2] },
+    next7: { label: "Next 7 days", idx: [0, 1, 2, 3, 4, 5, 6].map(i => TODAY + i) }
+  };
+
+  /* ============================================================
+     Helpers
+     ============================================================ */
+  const $ = s => document.querySelector(s);
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const fmt = n => (n < 0.05 ? "0" : n < 10 ? n.toFixed(1) : String(Math.round(n)));
+  const ft = m => Math.round(m * 3.28084).toLocaleString();
+  const tierOf = score => TIERS.find(t => score >= t.min);
+
+  const cacheGet = (key, ttl) => {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      if (v && Date.now() - v.t < ttl) return v;
+    } catch (e) { /* storage unavailable or corrupt */ }
+    return null;
+  };
+  const cacheSet = (key, data) => {
+    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), data })); } catch (e) { /* ignore */ }
+  };
+
+  function km(lat1, lon1, lat2, lon2) {
+    const rad = Math.PI / 180;
+    const a = Math.sin((lat2 - lat1) * rad / 2) ** 2 +
+      Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin((lon2 - lon1) * rad / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(a));
+  }
+
+  /* ============================================================
+     State
+     ============================================================ */
+  const resorts = window.RESORTS.map(([name, st, region, lat, lon, base, summit, pass, passNote], id) => ({
+    id, name, st, region, lat, lon, base, summit, pass: pass || "none", passNote,
+    qElev: Math.round(base + 0.7 * (summit - base)),
+    midElev: base + 0.55 * (summit - base),
+    us: US.has(st),
+    days: null,      // [{date, snow (in), tmax, tmin, wind}]
+    station: null,   // nearest SNOTEL station
+    obs: null        // {gain, depth} from SNOTEL
+  }));
+
+  const state = {
+    view: "now",
+    window: "next3",
+    region: "All",
+    pass: "All",         // All | epic | ikon | none
+    ready: false,
+    error: null,
+    snotel: "pending",   // pending | ok | unavailable
+    updated: null,
+    stats: new Map(),    // resort id -> stats for whatever the current view scores
+    active: null
+  };
+
+  /* ============================================================
+     Powder score
+     ============================================================ */
+  function dayScore(d) {
+    if (!d) return 0;
+    const s = clamp(d.snow / 12);                       // 12" in a day maxes out snowfall
+    const cold = clamp((34 - (d.tmax + d.tmin) / 2) / 14); // 34F -> 0, 20F or colder -> 1
+    const calm = 1 - clamp((d.wind - 15) / 25);          // 15 mph -> 1, 40 mph -> 0
+    const q = Math.sqrt(s);                              // cold and calm only matter if it snows
+    return 100 * (0.65 * s + 0.25 * cold * q + 0.10 * calm * q);
+  }
+
+  // Diminishing returns across days: 1 - product of (1 - score).
+  const combine = scores => 100 * (1 - scores.reduce((p, x) => p * (1 - clamp(x / 100)), 1));
+
+  function stats(r, idxs, weights) {
+    const w = weights || idxs.map(() => 1);
+    const ds = idxs.map(i => r.days[i]);
+    const snow = ds.reduce((a, d) => a + d.snow, 0);
+    const score = combine(ds.map((d, k) => dayScore(d) * w[k]));
+    const avg = d => (d.tmax + d.tmin) / 2;
+    const avgT = snow > 0.1
+      ? ds.reduce((a, d) => a + avg(d) * d.snow, 0) / snow   // temperature on the snowy days
+      : ds.reduce((a, d) => a + avg(d), 0) / ds.length;
+    const wind = Math.max(...ds.map(d => d.wind));
+    return { snow, score, avgT, wind, ds };
+  }
+
+  function blurb(st) {
+    if (st.snow < 0.5) return "Not much snow in the forecast here.";
+    const bits = [`${fmt(st.snow)}″ of new snow`];
+    if (st.avgT <= 22) bits.push("cold enough for light, dry snow");
+    else if (st.avgT <= 30) bits.push("temperatures that should ski well");
+    else bits.push("warm temperatures, so expect heavier, wetter snow");
+    if (st.wind >= 35) bits.push("and strong wind that may close upper lifts");
+    else if (st.wind <= 15) bits.push("and light wind");
+    return bits.join(", ") + ".";
+  }
+
+  /* ============================================================
+     Data: Open-Meteo forecasts
+     ============================================================ */
+  function parseDaily(daily) {
+    return daily.time.map((date, i) => ({
+      date,
+      snow: (daily.snowfall_sum[i] || 0) / 2.54,   // cm -> inches
+      tmax: daily.temperature_2m_max[i] ?? 32,
+      tmin: daily.temperature_2m_min[i] ?? 32,
+      wind: daily.wind_speed_10m_max[i] ?? 0
+    }));
+  }
+
+  async function loadForecasts(force) {
+    const key = `ft:forecast:v1:${resorts.length}`;
+    if (!force) {
+      const c = cacheGet(key, FORECAST_TTL);
+      if (c && c.data.length === resorts.length) {
+        c.data.forEach((days, i) => { resorts[i].days = days; });
+        return c.t;
+      }
+    }
+    const CHUNK = 30;
+    for (let i = 0; i < resorts.length; i += CHUNK) {
+      const part = resorts.slice(i, i + CHUNK);
+      const params = new URLSearchParams({
+        latitude: part.map(r => r.lat).join(","),
+        longitude: part.map(r => r.lon).join(","),
+        elevation: part.map(r => r.qElev).join(","),
+        daily: "snowfall_sum,temperature_2m_max,temperature_2m_min,wind_speed_10m_max",
+        temperature_unit: "fahrenheit",
+        wind_speed_unit: "mph",
+        timezone: "auto",
+        past_days: PAST,
+        forecast_days: FUTURE
+      });
+      const res = await fetch(`${METEO}?${params}`);
+      if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
+      const json = await res.json();
+      const list = Array.isArray(json) ? json : [json];
+      list.forEach((loc, j) => { part[j].days = parseDaily(loc.daily); });
+    }
+    cacheSet(key, resorts.map(r => r.days));
+    return Date.now();
+  }
+
+  /* ============================================================
+     Data: SNOTEL (US snow depth)
+     Tries the Netlify function first (avoids CORS), then the public API directly.
+     ============================================================ */
+  async function snotelFetch(endpoint, params) {
+    try {
+      const qs = new URLSearchParams({ endpoint, ...params });
+      const res = await fetch(`/.netlify/functions/snotel?${qs}`);
+      if ((res.headers.get("content-type") || "").includes("json") && res.ok) return await res.json();
+    } catch (e) { /* fall through to direct */ }
+    const res = await fetch(`${AWDB}/${endpoint}?${new URLSearchParams(params)}`);
+    if (!res.ok) throw new Error(`SNOTEL returned ${res.status}`);
+    return res.json();
+  }
+
+  async function loadStations() {
+    const c = cacheGet("ft:stations:v1", STATION_TTL);
+    if (c) return c.data;
+    const raw = await snotelFetch("stations", { networkCodes: "SNTL", activeOnly: "true" });
+    const list = raw
+      .filter(s => s.latitude != null && s.longitude != null && s.elevation != null)
+      .map(s => ({ id: s.stationTriplet, name: s.name, lat: s.latitude, lon: s.longitude, elev: s.elevation * 0.3048 }));
+    cacheSet("ft:stations:v1", list);
+    return list;
+  }
+
+  // Nearest station by distance, with a penalty for elevation mismatch (1 km ~ 40 m).
+  function matchStations(stations) {
+    for (const r of resorts) {
+      r.station = null;
+      if (!r.us) continue;
+      let best = null;
+      for (const s of stations) {
+        const d = km(r.lat, r.lon, s.lat, s.lon);
+        if (d > MAX_STATION_KM) continue;
+        const cost = d + Math.abs(s.elev - r.midElev) / 40;
+        if (!best || cost < best.cost) best = { ...s, dist: d, cost };
+      }
+      r.station = best;
+    }
+  }
+
+  async function loadObservations() {
+    const ids = [...new Set(resorts.filter(r => r.station).map(r => r.station.id))];
+    if (!ids.length) return;
+    const ref = resorts.find(r => r.days).days;
+    const beginDate = ref[TODAY - 4].date;
+    const endDate = ref[TODAY].date;
+    const depth = {};
+    for (let i = 0; i < ids.length; i += 40) {
+      const raw = await snotelFetch("data", {
+        stationTriplets: ids.slice(i, i + 40).join(","),
+        elements: "SNWD",
+        duration: "DAILY",
+        beginDate,
+        endDate
+      });
+      for (const rec of raw) {
+        const el = (rec.data || []).find(d => d.stationElement && d.stationElement.elementCode === "SNWD");
+        const map = {};
+        ((el && el.values) || []).forEach(v => { if (v.value != null) map[v.date] = v.value; });
+        depth[rec.stationTriplet] = map;
+      }
+    }
+    for (const r of resorts) {
+      if (!r.station) continue;
+      const map = depth[r.station.id] || {};
+      // Readings d-3 .. d. Each day-to-day gain covers one of the model's past 3 days.
+      const dates = [TODAY - 3, TODAY - 2, TODAY - 1, TODAY].map(i => r.days[i].date);
+      let gain = 0, pairs = 0;
+      for (let i = 1; i < dates.length; i++) {
+        const a = map[dates[i - 1]], b = map[dates[i]];
+        if (a == null || b == null) continue;
+        pairs++;
+        if (b - a >= 1) gain += b - a;   // ignore settling and sensor noise
+      }
+      const latest = [...dates].reverse().map(d => map[d]).find(v => v != null);
+      r.obs = pairs ? { gain, depth: latest ?? null } : (latest != null ? { gain: null, depth: latest } : null);
+    }
+  }
+
+  async function loadAll(force) {
+    state.ready = false;
+    state.error = null;
+    state.snotel = "pending";
+    setStatus("Loading…", true);
+    render();
+    try {
+      state.updated = await loadForecasts(force);
+    } catch (e) {
+      state.error = e.message;
+      setStatus("Forecast failed", false);
+      render();
+      return;
+    }
+    state.ready = true;
+    buildMarkers();
+    render();
+    setStatus(null, false);
+    try {
+      matchStations(await loadStations());
+      await loadObservations();
+      state.snotel = "ok";
+    } catch (e) {
+      console.warn("SNOTEL unavailable:", e);
+      state.snotel = "unavailable";
+    }
+    setStatus(null, false);
+    render();
+  }
+
+  function setStatus(text, busy) {
+    $("#refresh").disabled = busy;
+    if (text) { $("#status").textContent = text; return; }
+    const t = new Date(state.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const n = resorts.filter(r => r.obs).length;
+    const snotel = state.snotel === "ok" ? `${n} SNOTEL matches` : state.snotel === "pending" ? "SNOTEL loading" : "SNOTEL unavailable";
+    $("#status").textContent = `Updated ${t}, ${snotel}`;
+  }
+
+  /* ============================================================
+     Map
+     ============================================================ */
+  const map = L.map("map", { zoomControl: true }).setView([46, -108], 4);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+    subdomains: "abcd",
+    maxZoom: 12
+  }).addTo(map);
+  const layer = L.layerGroup().addTo(map);
+  const markers = new Map();
+
+  function markerIcon(score, snow, active) {
+    const t = tierOf(score);
+    const s = Math.round(12 + Math.min(snow, 18) * 0.8);
+    const cls = `mk mk-${t.shape}${t.n === 2 ? " mk-double" : ""}${t.hollow ? " mk-hollow" : ""}`;
+    return L.divIcon({
+      className: "mk-wrap" + (active ? " active" : ""),
+      html: `<i class="${cls}" style="--c:${t.color};--s:${s}px"></i>`,
+      iconSize: [s, s],
+      iconAnchor: [s / 2, s / 2]
+    });
+  }
+
+  function popupHtml(r) {
+    const s = state.stats.get(r.id);
+    if (!s) return `<div class="pop"><b>${r.name}</b></div>`;
+    const t = tierOf(s.score);
+    const obs = state.view === "now" && state.window === "past3" && r.obs && r.obs.gain != null
+      ? `<div class="obs">SNOTEL measured +${fmt(r.obs.gain)}″</div>` : "";
+    return `<div class="pop"><b>${r.name}${passPill(r)}</b><span>${r.st}, summit ${ft(r.summit)} ft</span>
+      <div class="big">${fmt(s.snow)}″<em>${t.name}</em></div>${obs}</div>`;
+  }
+
+  function buildMarkers() {
+    layer.clearLayers();
+    markers.clear();
+    for (const r of resorts) {
+      const m = L.marker([r.lat, r.lon], { icon: markerIcon(0, 0), riseOnHover: true, keyboard: true, title: r.name });
+      m.bindPopup(() => popupHtml(r), { closeButton: false, offset: [0, -4] });
+      m.on("click", () => setActive(r.id, { fly: false }));
+      markers.set(r.id, m);
+    }
+  }
+
+  function updateMarkers(visibleIds) {
+    layer.clearLayers();
+    for (const id of visibleIds) {
+      const s = state.stats.get(id);
+      const m = markers.get(id);
+      if (!s || !m) continue;
+      m.setIcon(markerIcon(s.score, s.snow, id === state.active));
+      m.setZIndexOffset(Math.round(s.score * 10));
+      layer.addLayer(m);
+    }
+  }
+
+  function fitRegion(ids) {
+    const pts = ids.map(id => [resorts[id].lat, resorts[id].lon]);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 7 });
+  }
+
+  function setActive(id, { fly }) {
+    state.active = id;
+    document.querySelectorAll("[data-id]").forEach(el =>
+      el.classList.toggle("active", Number(el.dataset.id) === id));
+    const r = resorts[id];
+    const m = markers.get(id);
+    if (fly) map.flyTo([r.lat, r.lon], Math.max(map.getZoom(), 7), { duration: 0.6 });
+    if (m) { m.openPopup(); }
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if (el && !fly) el.scrollIntoView({ block: "nearest" });
+    const s = state.stats.get(id);
+    if (s) markers.forEach((mk, mid) => {
+      const st = state.stats.get(mid);
+      if (st && layer.hasLayer(mk)) mk.setIcon(markerIcon(st.score, st.snow, mid === id));
+    });
+  }
+
+  $("#legend").innerHTML = TIERS.slice().reverse().map(t =>
+    `<span>${glyph(t, 12)}${t.name}</span>`).join("");
+
+  /* ============================================================
+     Rendering
+     ============================================================ */
+  function glyph(t, size = 14) {
+    const one = `<i class="mk mk-${t.shape}${t.hollow ? " mk-hollow" : ""}" style="--c:${t.color};--s:${size}px"></i>`;
+    return `<span class="glyph">${t.n === 2 ? one + one : one}</span>`;
+  }
+
+  const PASS_FILTERS = [["All", "Any pass"], ["epic", "Epic"], ["ikon", "Ikon"], ["none", "No pass"]];
+
+  function passMatches(r) {
+    if (state.pass === "All") return true;
+    if (state.pass === "epic") return r.pass === "epic" || r.pass === "epic-limited";
+    return r.pass === state.pass;
+  }
+
+  function visibleResorts() {
+    return resorts.filter(r => r.days && (state.region === "All" || r.region === state.region) && passMatches(r));
+  }
+
+  function passPill(r) {
+    if (r.pass === "none") return "";
+    const epic = r.pass !== "ikon";
+    const label = r.pass === "epic-limited" ? `Epic, ${r.passNote}` : epic ? "Epic" : "Ikon";
+    return `<span class="pass ${epic ? "pass-epic" : "pass-ikon"}">${label}</span>`;
+  }
+
+  function renderControls() {
+    const regions = ["All", ...new Set(resorts.map(r => r.region))];
+    const select = `<label class="sel"><span class="sr">Region</span><select id="region">${
+      regions.map(x => `<option value="${x}"${x === state.region ? " selected" : ""}>${x === "All" ? "All regions" : x}</option>`).join("")
+    }</select></label>`;
+    const passSelect = `<label class="sel"><span class="sr">Pass</span><select id="pass">${
+      PASS_FILTERS.map(([v, l]) => `<option value="${v}"${v === state.pass ? " selected" : ""}>${l}</option>`).join("")
+    }</select></label>`;
+    let html = "";
+    if (state.view === "now") {
+      html = `<div class="seg" role="group" aria-label="Time window">${
+        Object.entries(WINDOWS).map(([k, w]) =>
+          `<button type="button" data-win="${k}" aria-pressed="${k === state.window}">${w.label}</button>`).join("")
+      }</div>` + select + passSelect;
+    } else if (state.view === "weekend") {
+      html = select + passSelect;
+    }
+    $("#controls").innerHTML = html;
+  }
+
+  function rowHtml(r, s, extra = "") {
+    const t = tierOf(s.score);
+    return `<li><button type="button" class="row${r.id === state.active ? " active" : ""}" data-id="${r.id}" style="--w:${Math.round(s.score)}%">
+      ${glyph(t)}
+      <span class="who"><b>${r.name}${passPill(r)}</b>
+        <small>${r.st}, ${t.name}, avg ${Math.round(s.avgT)}°F, wind to ${Math.round(s.wind)} mph</small>${extra}</span>
+      <span class="snow"><b>${fmt(s.snow)}</b><small>in</small></span>
+    </button></li>`;
+  }
+
+  function renderNow() {
+    const w = WINDOWS[state.window];
+    const rows = visibleResorts()
+      .map(r => ({ r, s: stats(r, w.idx) }))
+      .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
+    state.stats = new Map(rows.map(x => [x.r.id, x.s]));
+    const html = rows.map(({ r, s }) => {
+      const chip = state.window === "past3" && r.obs && r.obs.gain != null
+        ? `<span class="chip" title="Snow depth gain at ${r.station.name}">SNOTEL measured +${fmt(r.obs.gain)}″</span>` : "";
+      return rowHtml(r, s, chip);
+    }).join("");
+    $("#content").innerHTML = rows.length ? `<ul class="list">${html}</ul>`
+      : `<p class="note">No resorts match these filters. Try a different region or pass.</p>`;
+    return rows.map(x => x.r.id);
+  }
+
+  function weekendIdx() {
+    const days = resorts[0].days;
+    const wd = i => new Date(days[i].date + "T12:00:00").getDay();
+    let sat;
+    if (wd(TODAY) === 0) sat = days.findIndex((d, i) => i > TODAY && wd(i) === 6);   // Sunday: look ahead
+    else sat = days.findIndex((d, i) => i >= TODAY && wd(i) === 6);
+    return { fri: sat - 1, sat, sun: sat + 1 };
+  }
+
+  function renderWeekend() {
+    const idx = weekendIdx();
+    const ids = [idx.fri, idx.sat, idx.sun];
+    const days = resorts[0].days;
+    const label = i => new Date(days[i].date + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+    const rows = visibleResorts()
+      .map(r => ({ r, s: stats(r, ids, [0.7, 1, 0.9]) }))   // Friday snow is fresh on Saturday; Sunday is leftovers
+      .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
+    state.stats = new Map(rows.map(x => [x.r.id, x.s]));
+
+    const top = rows.slice(0, 3);
+    const quiet = !top.length || top[0].s.score < 5;
+    const dow = i => new Date(days[i].date + "T12:00:00").toLocaleDateString([], { weekday: "short" });
+
+    const cards = quiet ? "" : top.map(({ r, s }) => {
+      const t = tierOf(s.score);
+      const cells = ids.map((i, k) => {
+        const d = r.days[i];
+        return `<div class="day"><span>${dow(i)}</span><b>${fmt(d.snow)}″</b><small>${Math.round(d.tmin)} to ${Math.round(d.tmax)}°F</small></div>`;
+      }).join("");
+      return `<button type="button" class="card${r.id === state.active ? " active" : ""}" data-id="${r.id}">
+        <div class="card-top">${glyph(t, 16)}
+          <div><h3>${r.name}${passPill(r)}</h3><div class="sub">${r.st}, ${t.name}</div></div>
+          <div class="snow"><b>${fmt(s.snow)}</b><small>in</small></div>
+        </div>
+        <div class="days">${cells}</div>
+        <p>${blurb(s)}</p>
+      </button>`;
+    }).join("");
+
+    const rest = (quiet ? rows : rows.slice(3)).map(({ r, s }) => rowHtml(r, s)).join("");
+    $("#content").innerHTML = `
+      <h2 class="when">${label(idx.sat)} and ${label(idx.sun)}</h2>
+      ${quiet ? `<p class="note">Nothing worth chasing this weekend. Check back when storms start rolling in.</p>` : `<div class="cards">${cards}</div>`}
+      ${rest ? `<h3 class="rest-title">${quiet ? "All resorts" : "Also in the running"}</h3><ul class="list">${rest}</ul>` : ""}`;
+    return rows.map(x => x.r.id);
+  }
+
+  function verdict(obs, model) {
+    const diff = model - obs;
+    if (Math.abs(diff) <= Math.max(1.5, obs * 0.3)) return { t: "Close", c: "ok" };
+    return diff > 0 ? { t: "Model high", c: "hi" } : { t: "Model low", c: "lo" };
+  }
+
+  function renderCheck() {
+    if (state.snotel === "pending") { $("#content").innerHTML = `<p class="note">Loading SNOTEL observations…</p>`; return []; }
+    if (state.snotel === "unavailable") {
+      $("#content").innerHTML = `<p class="note err">Couldn’t reach the SNOTEL service. Press Refresh to retry. If this keeps happening on your own host, deploy the included Netlify function, which proxies the request.</p>`;
+      return [];
+    }
+    const rows = resorts
+      .filter(r => r.days && r.station && r.obs && r.obs.gain != null)
+      .map(r => {
+        const model = r.days.slice(TODAY - 3, TODAY).reduce((a, d) => a + d.snow, 0);
+        return { r, model, obs: r.obs.gain, v: verdict(r.obs.gain, model) };
+      })
+      .sort((a, b) => Math.max(b.obs, b.model) - Math.max(a.obs, a.model));
+
+    if (!rows.length) {
+      $("#content").innerHTML = `<p class="note">No SNOTEL readings matched resorts yet. Outside winter, most stations report no new snow.</p>`;
+      return [];
+    }
+    const meanObs = rows.reduce((a, x) => a + x.obs, 0) / rows.length;
+    const meanModel = rows.reduce((a, x) => a + x.model, 0) / rows.length;
+    const bias = meanModel - meanObs;
+    const sum = Math.abs(bias) < 0.5 || (meanObs + meanModel) < 1
+      ? "The model and the stations agree on average."
+      : bias > 0 ? `The model is running high by about ${fmt(bias)}″ per resort.` : `The model is running low by about ${fmt(-bias)}″ per resort.`;
+
+    $("#content").innerHTML = `
+      <p class="summary">Over the past 3 days, ${rows.length} resorts averaged ${fmt(meanModel)}″ in the model and ${fmt(meanObs)}″ at the nearest SNOTEL station. ${sum} Treat forecast totals accordingly.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Resort</th><th>Station</th><th class="num">Measured</th><th class="num">Model</th><th>Verdict</th><th class="num">Base depth</th></tr></thead>
+        <tbody>${rows.map(({ r, model, obs, v }) => `<tr>
+          <td><b>${r.name}</b>, ${r.st}</td>
+          <td>${r.station.name} <small>${Math.round(r.station.dist)} km, ${ft(r.station.elev)} ft</small></td>
+          <td class="num">${fmt(obs)}″</td><td class="num">${fmt(model)}″</td>
+          <td><span class="v ${v.c}">${v.t}</span></td>
+          <td class="num">${r.obs.depth != null ? Math.round(r.obs.depth) + "″" : "n/a"}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`;
+    return [];
+  }
+
+  function render() {
+    document.querySelectorAll(".tabs button").forEach(b => {
+      if (b.dataset.view === state.view) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    });
+    $("#app").dataset.view = state.view;
+    renderControls();
+
+    if (state.error) {
+      $("#content").innerHTML = `<p class="note err">Couldn’t load forecasts: ${state.error}. Check your connection and press Refresh.</p>`;
+      return;
+    }
+    if (!state.ready) { $("#content").innerHTML = `<p class="note">Loading forecasts for ${resorts.length} resorts…</p>`; return; }
+
+    let ids = [];
+    if (state.view === "now") ids = renderNow();
+    else if (state.view === "weekend") ids = renderWeekend();
+    else ids = renderCheck();
+
+    if (state.view !== "check") {
+      updateMarkers(ids);
+      setTimeout(() => map.invalidateSize(), 0);
+    }
+  }
+
+  /* ============================================================
+     Events
+     ============================================================ */
+  function setView(view) {
+    state.view = view;
+    state.active = null;
+    history.replaceState(null, "", "#" + view);
+    render();
+  }
+
+  document.querySelector(".tabs").addEventListener("click", e => {
+    const b = e.target.closest("button[data-view]");
+    if (b) setView(b.dataset.view);
+  });
+
+  $("#controls").addEventListener("click", e => {
+    const b = e.target.closest("button[data-win]");
+    if (!b) return;
+    state.window = b.dataset.win;
+    render();
+  });
+
+  $("#controls").addEventListener("change", e => {
+    if (e.target.id === "region") state.region = e.target.value;
+    else if (e.target.id === "pass") state.pass = e.target.value;
+    else return;
+    render();
+    fitRegion(visibleResorts().map(r => r.id));
+  });
+
+  $("#content").addEventListener("click", e => {
+    const el = e.target.closest("[data-id]");
+    if (el) setActive(Number(el.dataset.id), { fly: true });
+  });
+
+  $("#refresh").addEventListener("click", () => loadAll(true));
+
+  /* ============================================================
+     Go
+     ============================================================ */
+  const hash = location.hash.slice(1);
+  if (["now", "weekend", "check"].includes(hash)) state.view = hash;
+  loadAll(false);
+})();
