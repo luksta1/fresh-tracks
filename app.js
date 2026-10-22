@@ -20,12 +20,13 @@
   const US = new Set(["CO", "UT", "WY", "MT", "ID", "NM", "AZ", "CA", "NV", "OR", "WA", "AK", "VT", "NH", "ME", "NY"]);
 
   // Score tiers use ski-trail signage: circle, square, diamond, double diamond.
+  // On the dark theme black diamonds read as white, and "Send it" takes the accent.
   const TIERS = [
-    { min: 75, name: "Send it", shape: "diamond", n: 2, color: "#0f1417" },
-    { min: 50, name: "Deep", shape: "diamond", n: 1, color: "#0f1417" },
-    { min: 25, name: "Good", shape: "square", n: 1, color: "#1f6fdb" },
-    { min: 5, name: "Light", shape: "circle", n: 1, color: "#1e9a57" },
-    { min: 0, name: "Quiet", shape: "circle", n: 1, color: "#9aa9b0", hollow: true }
+    { min: 75, name: "Send it", shape: "diamond", n: 2, color: "#c6ff3d" },
+    { min: 50, name: "Deep", shape: "diamond", n: 1, color: "#eef3f7" },
+    { min: 25, name: "Good", shape: "square", n: 1, color: "#3b8bff" },
+    { min: 5, name: "Light", shape: "circle", n: 1, color: "#2fd07a" },
+    { min: 0, name: "Quiet", shape: "circle", n: 1, color: "#5b6878", hollow: true }
   ];
 
   const WINDOWS = {
@@ -318,8 +319,8 @@
     if (text) { $("#status").textContent = text; return; }
     const t = new Date(state.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     const n = resorts.filter(r => r.obs).length;
-    const snotel = state.snotel === "ok" ? `${n} SNOTEL matches` : state.snotel === "pending" ? "SNOTEL loading" : "SNOTEL unavailable";
-    $("#status").textContent = `Updated ${t}, ${snotel}`;
+    const snotel = state.snotel === "ok" ? `${n} SNOTEL` : state.snotel === "pending" ? "SNOTEL loading" : "SNOTEL offline";
+    $("#status").textContent = `Updated ${t} · ${snotel}`;
   }
 
   /* ============================================================
@@ -328,7 +329,7 @@
   // If the Leaflet CDN fails, drop the map and keep the list working.
   const map = window.L ? L.map("map", { zoomControl: true }).setView([46, -108], 4) : null;
   if (map) {
-    // Standard OSM tiles (no key). styles.css desaturates them so the trail glyphs stand out.
+    // Standard OSM tiles (no key). styles.css inverts and dims them into a night map.
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 12
@@ -357,8 +358,8 @@
     const t = tierOf(s.score);
     const obs = state.view === "now" && state.window === "past3" && r.obs && r.obs.gain != null
       ? `<div class="obs">SNOTEL measured +${fmt(r.obs.gain)}″</div>` : "";
-    return `<div class="pop"><b>${r.name}${passPill(r)}</b><span>${r.st}, summit ${ft(r.summit)} ft</span>
-      <div class="big">${fmt(s.snow)}″<em>${t.name}</em></div>${obs}</div>`;
+    return `<div class="pop"><b>${r.name}</b><span>${r.st} · summit ${ft(r.summit)} ft</span>
+      <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${t.name}</em></div>${obs}</div>`;
   }
 
   function buildMarkers() {
@@ -410,16 +411,31 @@
     });
   }
 
-  $("#legend").innerHTML = TIERS.slice().reverse().map(t =>
-    `<span>${glyph(t, 12)}${t.name}</span>`).join("");
-
   /* ============================================================
      Rendering
      ============================================================ */
-  function glyph(t, size = 14) {
-    const one = `<i class="mk mk-${t.shape}${t.hollow ? " mk-hollow" : ""}" style="--c:${t.color};--s:${size}px"></i>`;
+  const INCH = `<span class="inch">″</span>`;
+  const amt = n => `<span class="amt">${fmt(n)}${INCH}</span>`;
+
+  function glyph(t, size = 14, color = t.color) {
+    const one = `<i class="mk mk-${t.shape}${t.hollow ? " mk-hollow" : ""}" style="--c:${color};--s:${size}px"></i>`;
     return `<span class="glyph">${t.n === 2 ? one + one : one}</span>`;
   }
+
+  // Tier pill: the tier's own color as the fill, with a dark glyph on it.
+  const tierPill = t =>
+    `<span class="tier${t.hollow ? " hollow" : ""}" style="--c:${t.color}">${glyph(t, 10, t.hollow ? t.color : "#0e1622")}${t.name}</span>`;
+
+  // Contour lines behind the hero. Decoration only.
+  const TOPO = `<svg class="topo" aria-hidden="true" viewBox="0 0 800 500" preserveAspectRatio="none">${
+    [0, 1, 2, 3, 4, 5, 6].map(k => {
+      const y = 420 - k * 40;
+      return `<path d="M-20 ${y} C120 ${y - 40} 200 ${y - 120} 320 ${y - 100} S540 ${y} 680 ${y - 60} S820 ${y - 160} 840 ${y - 150}"/>`;
+    }).join("")
+  }</svg>`;
+
+  $("#legend").innerHTML = TIERS.slice().reverse().map(t =>
+    `<span style="color:${t.hollow ? "" : t.color}">${glyph(t, 10)}${t.name}</span>`).join("");
 
   const PASS_FILTERS = [["All", "Any pass"], ["epic", "Epic"], ["ikon", "Ikon"], ["none", "No pass"]];
 
@@ -436,7 +452,7 @@
   function passPill(r) {
     if (r.pass === "none") return "";
     const epic = r.pass !== "ikon";
-    const label = r.pass === "epic-limited" ? `Epic, ${r.passNote}` : epic ? "Epic" : "Ikon";
+    const label = r.pass === "epic-limited" ? `Epic · ${r.passNote}` : epic ? "Epic" : "Ikon";
     return `<span class="pass ${epic ? "pass-epic" : "pass-ikon"}">${label}</span>`;
   }
 
@@ -448,7 +464,7 @@
     const passSelect = `<label class="sel"><span class="sr">Pass</span><select id="pass">${
       PASS_FILTERS.map(([v, l]) => `<option value="${v}"${v === state.pass ? " selected" : ""}>${l}</option>`).join("")
     }</select></label>`;
-    const share = `<button type="button" class="share" id="share">Copy link</button>`;
+    const share = `<button type="button" class="ghost share" id="share">Copy link</button>`;
     let html = "";
     if (state.view === "now") {
       html = `<div class="seg" role="group" aria-label="Time window">${
@@ -461,14 +477,53 @@
     $("#controls").innerHTML = html;
   }
 
-  function rowHtml(r, s, extra = "") {
+  function rowHtml(r, s, rank, extra = "") {
     const t = tierOf(s.score);
-    return `<li><button type="button" class="row${r.id === state.active ? " active" : ""}" data-id="${r.id}" style="--w:${Math.round(s.score)}%">
-      ${glyph(t)}
-      <span class="who"><b>${r.name}${passPill(r)}</b>
-        <small>${r.st}, ${t.name}, avg ${Math.round(s.avgT)}°F, wind to ${Math.round(s.wind)} mph</small>${extra}</span>
-      <span class="snow"><b>${fmt(s.snow)}</b><small>in</small></span>
+    const meta = `${r.st} · ${t.name} · avg ${Math.round(s.avgT)}°F · wind ${Math.round(s.wind)} mph`;
+    return `<li><button type="button" class="row${r.id === state.active ? " active" : ""}" data-id="${r.id}">
+      <span class="rank">${String(rank).padStart(2, "0")}</span>
+      ${glyph(t, 16)}
+      <span class="who">
+        <span class="who-top"><span class="name">${r.name}</span>${passPill(r)}</span>
+        <span class="meta"><span>${meta}</span>${extra}</span>
+        <span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w:${Math.round(s.score)}%"></span></span>
+      </span>
+      ${amt(s.snow)}
     </button></li>`;
+  }
+
+  const stat = (label, value, cls = "") => `<div><span>${label}</span><b class="${cls}">${value}</b></div>`;
+
+  // The deepest resort in the window, big. Past days compare to SNOTEL; forecasts to ECMWF.
+  function heroHtml(top, w, count) {
+    if (!top) return "";
+    const { r, s } = top;
+    const t = tierOf(s.score);
+    const quiet = s.score < 5;
+    let check;
+    if (state.window === "past3") {
+      check = r.obs && r.obs.gain != null ? stat("SNOTEL measured", `${fmt(r.obs.gain)}″`) : stat("SNOTEL measured", "n/a");
+    } else if (s.snowAlt == null) {
+      check = stat("ECMWF says", "n/a");
+    } else {
+      const c = confidence(s);
+      check = stat("ECMWF says", `${fmt(s.snowAlt)}″${c ? `<small>${c.t.replace("Models ", "")}</small>` : ""}`, c ? c.c : "");
+    }
+    return `<section class="hero${quiet ? " quiet" : ""}">${TOPO}
+      <div class="kicker">${quiet ? "Nothing deep yet" : "Deepest"} · ${w.label} · ${count} resorts</div>
+      <div class="hero-main">
+        <div class="big">${fmt(s.snow)}${INCH}</div>
+        <div>
+          <h2>${r.name}</h2>
+          <div class="hero-tags">${tierPill(t)}${passPill(r)}<span class="st">${r.st}</span></div>
+        </div>
+      </div>
+      <div class="stats">
+        ${stat("Avg temp", `${Math.round(s.avgT)}°F`)}
+        ${stat("Wind to", `${Math.round(s.wind)} mph`)}
+        ${check}
+      </div>
+    </section>`;
   }
 
   function renderNow() {
@@ -477,14 +532,15 @@
       .map(r => ({ r, s: stats(r, w.idx) }))
       .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
     state.stats = new Map(rows.map(x => [x.r.id, x.s]));
+    $("#hero").innerHTML = heroHtml(rows[0], w, rows.length);
     // Past days get the SNOTEL measurement; forecast windows get the second-model check.
-    const html = rows.map(({ r, s }) => {
+    const html = rows.map(({ r, s }, i) => {
       const chip = state.window !== "past3" ? confBadge(s)
         : r.obs && r.obs.gain != null
-          ? `<span class="chip" title="Snow depth gain at ${r.station.name}">SNOTEL measured +${fmt(r.obs.gain)}″</span>` : "";
-      return rowHtml(r, s, chip);
+          ? `<span class="chip" title="Snow depth gain at ${r.station.name}">SNOTEL +${fmt(r.obs.gain)}″</span>` : "";
+      return rowHtml(r, s, i + 1, chip);
     }).join("");
-    $("#content").innerHTML = rows.length ? `<ul class="list">${html}</ul>`
+    $("#content").innerHTML = rows.length ? `<ol class="list">${html}</ol>`
       : `<p class="note">No resorts match these filters. Try a different region or pass.</p>`;
     return rows.map(x => x.r.id);
   }
@@ -502,7 +558,8 @@
     const idx = weekendIdx();
     const ids = [idx.fri, idx.sat, idx.sun];
     const days = resorts[0].days;
-    const label = i => new Date(days[i].date + "T12:00:00").toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+    const date = i => new Date(days[i].date + "T12:00:00");
+    const dow = i => date(i).toLocaleDateString([], { weekday: "short" });
     const rows = visibleResorts()
       .map(r => ({ r, s: stats(r, ids, [0.7, 1, 0.9]) }))   // Friday snow is fresh on Saturday; Sunday is leftovers
       .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
@@ -510,29 +567,34 @@
 
     const top = rows.slice(0, 3);
     const quiet = !top.length || top[0].s.score < 5;
-    const dow = i => new Date(days[i].date + "T12:00:00").toLocaleDateString([], { weekday: "short" });
 
-    const cards = quiet ? "" : top.map(({ r, s }) => {
+    $("#hero").innerHTML = `<section class="wk-head">
+      <div class="kicker">Where to ride</div>
+      <h2>${dow(idx.sat)} ${date(idx.sat).getDate()}<span class="slash"> / </span>${dow(idx.sun)} ${date(idx.sun).getDate()}</h2>
+      <p>Friday’s snow counts as fresh on Saturday. Sunday is leftovers.</p>
+    </section>`;
+
+    const cards = quiet ? "" : top.map(({ r, s }, k) => {
       const t = tierOf(s.score);
-      const cells = ids.map((i, k) => {
+      const cells = ids.map(i => {
         const d = r.days[i];
-        return `<div class="day"><span>${dow(i)}</span><b>${fmt(d.snow)}″</b><small>${Math.round(d.tmin)} to ${Math.round(d.tmax)}°F</small></div>`;
+        return `<span class="day"><span>${dow(i)}</span><b>${fmt(d.snow)}″</b><small>${Math.round(d.tmin)}–${Math.round(d.tmax)}°F</small></span>`;
       }).join("");
-      return `<button type="button" class="card${r.id === state.active ? " active" : ""}" data-id="${r.id}">
-        <div class="card-top">${glyph(t, 16)}
-          <div><h3>${r.name}${passPill(r)}</h3><div class="sub">${r.st}, ${t.name}</div></div>
-          <div class="snow"><b>${fmt(s.snow)}</b><small>in</small></div>
-        </div>
-        <div class="days">${cells}</div>
-        <p>${blurb(s)}</p>${confBadge(s)}
+      return `<button type="button" class="card${k === 0 ? " top" : ""}${r.id === state.active ? " active" : ""}" data-id="${r.id}">
+        <span class="ghost-rank" aria-hidden="true">${k + 1}</span>
+        <span class="card-tags">${tierPill(t)}${passPill(r)}<span class="st">${r.st}</span></span>
+        <span class="card-mid"><span class="card-name">${r.name}</span>${amt(s.snow)}</span>
+        <span class="days">${cells}</span>
+        <span class="blurb">${blurb(s)}</span>${confBadge(s)}
       </button>`;
     }).join("");
 
-    const rest = (quiet ? rows : rows.slice(3)).map(({ r, s }) => rowHtml(r, s, confBadge(s))).join("");
+    const offset = quiet ? 1 : 4;
+    const rest = (quiet ? rows : rows.slice(3)).map(({ r, s }, i) => rowHtml(r, s, i + offset, confBadge(s))).join("");
+    $("#picks").innerHTML = quiet ? `<p class="note">Nothing worth chasing this weekend. Check back when storms start rolling in.</p>`
+      : `<div class="cards">${cards}</div>`;
     $("#content").innerHTML = `
-      <h2 class="when">${label(idx.sat)} and ${label(idx.sun)}</h2>
-      ${quiet ? `<p class="note">Nothing worth chasing this weekend. Check back when storms start rolling in.</p>` : `<div class="cards">${cards}</div>`}
-      ${rest ? `<h3 class="rest-title">${quiet ? "All resorts" : "Also in the running"}</h3><ul class="list">${rest}</ul>` : ""}`;
+      ${rest ? `<h3 class="rest-title">${quiet ? "All resorts" : "Also in the running"}</h3><ol class="list">${rest}</ol>` : ""}`;
     return rows.map(x => x.r.id);
   }
 
@@ -543,9 +605,10 @@
   }
 
   function renderCheck() {
-    if (state.snotel === "pending") { $("#content").innerHTML = `<p class="note">Loading SNOTEL observations…</p>`; return []; }
+    const note = (text, err) => `<p class="note${err ? " err" : ""}">${text}</p>`;
+    if (state.snotel === "pending") { $("#content").innerHTML = note("Loading SNOTEL observations…"); return []; }
     if (state.snotel === "unavailable") {
-      $("#content").innerHTML = `<p class="note err">Couldn’t reach the SNOTEL service. It has occasional outages; press Refresh to retry.</p>`;
+      $("#content").innerHTML = note("Couldn’t reach the SNOTEL service. It has occasional outages; press Refresh to retry.", true);
       return [];
     }
     const rows = resorts
@@ -557,7 +620,7 @@
       .sort((a, b) => Math.max(b.obs, b.model) - Math.max(a.obs, a.model));
 
     if (!rows.length) {
-      $("#content").innerHTML = `<p class="note">No SNOTEL readings matched resorts yet. Outside winter, most stations report no new snow.</p>`;
+      $("#content").innerHTML = note("No SNOTEL readings matched resorts yet. Outside winter, most stations report no new snow.");
       return [];
     }
     const meanObs = rows.reduce((a, x) => a + x.obs, 0) / rows.length;
@@ -567,18 +630,20 @@
       ? "The model and the stations agree on average."
       : bias > 0 ? `The model is running high by about ${fmt(bias)}″ per resort.` : `The model is running low by about ${fmt(-bias)}″ per resort.`;
 
-    $("#content").innerHTML = `
-      <p class="summary">Over the past 3 days, ${rows.length} resorts averaged ${fmt(meanModel)}″ in the model and ${fmt(meanObs)}″ at the nearest SNOTEL station. ${sum} Treat forecast totals accordingly.</p>
+    $("#content").innerHTML = `<div class="check">
+      <div class="kicker">Model check · past 3 days</div>
+      <p class="summary">${rows.length} resorts averaged ${fmt(meanModel)}″ in the model and ${fmt(meanObs)}″ at the nearest SNOTEL station. ${sum} Treat forecast totals accordingly.</p>
       <div class="tablewrap"><table>
         <thead><tr><th>Resort</th><th>Station</th><th class="num">Measured</th><th class="num">Model</th><th>Verdict</th><th class="num">Base depth</th></tr></thead>
         <tbody>${rows.map(({ r, model, obs, v }) => `<tr>
-          <td><b>${r.name}</b>, ${r.st}</td>
-          <td>${r.station.name} <small>${Math.round(r.station.dist)} km, ${ft(r.station.elev)} ft</small></td>
+          <td><b>${r.name}</b> <small>${r.st}</small></td>
+          <td>${r.station.name} <small>${Math.round(r.station.dist)} km · ${ft(r.station.elev)} ft</small></td>
           <td class="num">${fmt(obs)}″</td><td class="num">${fmt(model)}″</td>
           <td><span class="v ${v.c}">${v.t}</span></td>
           <td class="num">${r.obs.depth != null ? Math.round(r.obs.depth) + "″" : "n/a"}</td>
         </tr>`).join("")}</tbody>
-      </table></div>`;
+      </table></div>
+    </div>`;
     return [];
   }
 
@@ -590,6 +655,8 @@
     });
     $("#app").dataset.view = state.view;
     renderControls();
+    $("#hero").innerHTML = "";
+    $("#picks").innerHTML = "";
 
     if (state.error) {
       $("#content").innerHTML = `<p class="note err">Couldn’t load forecasts: ${state.error}. Check your connection and press Refresh.</p>`;
@@ -660,10 +727,11 @@
       try {
         await navigator.clipboard.writeText(location.href);
         b.textContent = "Link copied";
+        b.classList.add("copied");
       } catch (err) {
         b.textContent = "Copy from the address bar";
       }
-      setTimeout(() => { if (b.isConnected) b.textContent = "Copy link"; }, 1800);
+      setTimeout(() => { if (b.isConnected) { b.textContent = "Copy link"; b.classList.remove("copied"); } }, 1800);
       return;
     }
     const b = e.target.closest("button[data-win]");

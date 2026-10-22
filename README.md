@@ -10,6 +10,13 @@ Forecast rows carry a confidence badge comparing the main model with ECMWF. The 
 holds the view and filters (`#weekend?region=Utah&pass=ikon`), so "Copy link" shares
 exactly what you're looking at.
 
+## Look
+
+"Storm Night": navy ground, one hi-vis accent (`--accent` in `styles.css`), Big Shoulders
+Display for names and totals, JetBrains Mono for data, trail-sign glyphs for score tiers.
+The map is standard OSM tiles inverted and dimmed with a CSS filter (`.leaflet-tile-pane`),
+so there's no tile key to manage.
+
 ## Run locally
 
     python3 -m http.server 8000      # or: npx serve .
