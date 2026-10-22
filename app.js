@@ -342,13 +342,60 @@
     // Standard OSM tiles (no key). styles.css inverts and dims them into a night map.
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · resorts <a href="https://openskimap.org">OpenSkiMap</a>',
-      maxZoom: 12
+      maxZoom: 15
     }).addTo(map);
   } else {
     $("#mapwrap").hidden = true;
   }
   const layer = map && L.layerGroup().addTo(map);
   const markers = new Map();
+
+  /* Trails: each resort's runs and lifts from trails/<slug>.json (scripts/build-trails.mjs),
+     fetched the first time the map is zoomed in near that resort. */
+  const TRAIL_ZOOM = 11;
+  const RUN_COLORS = { g: "#2fd07a", b: "#3b8bff", k: "#eef3f7", d: "#c6ff3d", "": "#5b6878" };
+  // Must match slug() in scripts/build-trails.mjs.
+  const trailSlug = name => name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const trailLayer = map && L.layerGroup();
+  const trailRenderer = map && L.canvas({ padding: 0.5 });
+  const trails = new Map();   // resort id -> "loading" | "missing" | layer group
+  const tip = { sticky: true, className: "trail-tip" };
+
+  async function loadTrails(r) {
+    trails.set(r.id, "loading");
+    try {
+      const res = await fetch(`trails/${trailSlug(r.name)}.json`);
+      if (!res.ok) throw new Error(`trails for ${r.name}: ${res.status}`);
+      const { runs, lifts } = await res.json();
+      const group = L.layerGroup();
+      for (const [sign, name, pts] of runs) {
+        const line = L.polyline(pts, { renderer: trailRenderer, color: RUN_COLORS[sign] ?? RUN_COLORS[""], weight: sign ? 2.5 : 1.5, opacity: sign ? 0.9 : 0.5 });
+        if (name) line.bindTooltip(name, tip);
+        group.addLayer(line);
+      }
+      for (const [name, , pts] of lifts) {
+        const line = L.polyline(pts, { renderer: trailRenderer, color: "#eef3f7", weight: 1.5, opacity: 0.75, dashArray: "5 4" });
+        line.bindTooltip(name ? `${name} · lift` : "Lift", tip);
+        group.addLayer(line);
+      }
+      trails.set(r.id, group);
+      trailLayer.addLayer(group);
+    } catch (e) {
+      console.warn(e);
+      trails.set(r.id, "missing");
+    }
+  }
+
+  function syncTrails() {
+    const near = map.getZoom() >= TRAIL_ZOOM;
+    $("#mapwrap").classList.toggle("trails-on", near);
+    if (!near) { map.removeLayer(trailLayer); return; }
+    trailLayer.addTo(map);
+    const view = map.getBounds().pad(0.5);
+    for (const r of resorts) if (!trails.has(r.id) && view.contains([r.lat, r.lon])) loadTrails(r);
+  }
+  if (map) map.on("zoomend moveend", syncTrails);
 
   function markerIcon(score, snow, active) {
     const t = tierOf(score);
@@ -412,8 +459,13 @@
     if (!map) return;
     const r = resorts[id];
     const m = markers.get(id);
-    if (fly) map.flyTo([r.lat, r.lon], Math.max(map.getZoom(), 7), { duration: 0.6 });
-    if (m) { m.openPopup(); }
+    // Open the popup after the flight: its auto-pan would otherwise cancel the animation.
+    if (fly) {
+      map.flyTo([r.lat, r.lon], Math.max(map.getZoom(), TRAIL_ZOOM + 2), { duration: 0.8 });
+      if (m) map.once("moveend", () => m.openPopup());
+    } else if (m) {
+      m.openPopup();
+    }
     const s = state.stats.get(id);
     if (s) markers.forEach((mk, mid) => {
       const st = state.stats.get(mid);
@@ -460,7 +512,8 @@
   }</svg>`;
 
   $("#legend").innerHTML = TIERS.slice().reverse().map(t =>
-    `<span style="color:${t.hollow ? "" : t.color}">${glyph(t, 10)}${t.name}</span>`).join("");
+    `<span style="color:${t.hollow ? "" : t.color}">${glyph(t, 10)}${t.name}</span>`).join("") +
+    `<span class="hint-far">Zoom in for trails</span><span class="hint-near"><i class="lift-key"></i>Lift</span>`;
 
   const PASS_FILTERS = [["All", "Any pass"], ["epic", "Epic"], ["ikon", "Ikon"], ["none", "No pass"]];
 

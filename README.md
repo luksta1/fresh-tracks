@@ -35,6 +35,9 @@ Any static host works. On Netlify, `netlify.toml` sets the publish directory to 
 - `resort-meta.js`: generated, don't edit. After changing `resorts.js` (and once a season), run
   `node scripts/enrich-resorts.mjs` to refresh it. It prints each match so you can spot a wrong one;
   fix those with `OVERRIDES` at the top of the script.
+- `trails/`: generated, don't edit. One file per resort with its runs and lifts, drawn on the map
+  from zoom 11 in (picking a resort flies there). Rebuild after refreshing `resort-meta.js`:
+  `node scripts/build-trails.mjs` (streams OpenSkiMap's runs and lifts files, about 10 seconds).
 - `app.js`, `MODELS`: the main forecast model and the second opinion (any Open-Meteo model ids).
 - `app.js`, `dayScore()`: tune the powder score weights.
 - `app.js`, `confidence()`: tune when models count as agreeing.
@@ -47,7 +50,8 @@ Any static host works. On Netlify, `netlify.toml` sets the publish directory to 
   `elevation` parameter mainly corrects temperature.
 - Resorts: OpenSkiMap (openskimap.org), © OpenStreetMap contributors, ODbL. Supplies location,
   lift-served base and summit, lift count, trail length, and the green/blue/black mix by trail
-  length (run counts depend on how mappers split trails, so they aren't shown). These values
+  length (run counts depend on how mappers split trails, so they aren't shown), and the run and
+  lift lines in `trails/`, simplified to about 4 m. These values
   override the hand-entered ones in `resorts.js`.
 - Snow depth: USDA NRCS SNOTEL via the AWDB REST API, stations filtered with the
   `*:*:SNTL` triplet wildcard. Measured "new snow" is the sum of daily depth gains of 1" or

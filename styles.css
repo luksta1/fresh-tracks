@@ -437,6 +437,22 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   color: var(--muted);
 }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .hint-far { color: var(--dim); }
+.legend .hint-near { display: none; }
+.trails-on .legend .hint-far { display: none; }
+.trails-on .legend .hint-near { display: inline-flex; }
+.lift-key { display: block; width: 18px; border-top: 2px dashed var(--text); opacity: .75; }
+.leaflet-tooltip.trail-tip {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  font: 500 11px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.leaflet-tooltip.trail-tip::before { display: none; }
 
 /* ---------- small screens: hero, map, controls, list in one column ---------- */
 @media (max-width: 860px) {
