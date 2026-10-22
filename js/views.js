@@ -179,7 +179,7 @@ export function weekendHeadHtml(days, idx) {
   const sat = days[idx.sat], sun = days[idx.sun];
   return `<section class="wk-head">
     <div class="kicker">Where to ride</div>
-    <h2>${dow(sat)} ${dateOf(sat).getDate()}<span class="slash"> / </span>${dow(sun)} ${dateOf(sun).getDate()}</h2>
+    <h2><span class="nw">${dow(sat)} ${dateOf(sat).getDate()}</span><span class="slash"> / </span><span class="nw">${dow(sun)} ${dateOf(sun).getDate()}</span></h2>
     <p>Friday’s snow counts as fresh on Saturday. Sunday is leftovers.</p>
   </section>`;
 }

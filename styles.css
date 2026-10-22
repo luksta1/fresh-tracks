@@ -365,6 +365,7 @@ button { cursor: pointer; }
   letter-spacing: -.01em;
 }
 .wk-head h2 .slash { color: var(--line-2); }
+.wk-head h2 .nw { white-space: nowrap; }   /* a wrap may fall at the slash, never inside a date */
 .wk-head p { margin: 16px 0 0; color: var(--muted); font-size: 17px; max-width: 52ch; }
 .cards {
   display: grid;
@@ -518,15 +519,20 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .hero h2 { font-size: 44px; }
   .stats b { font-size: 26px; }
   .stats div { padding: 10px 12px; }
+  /* Controls: smaller type and padding so both filters and Copy link share one row. */
+  #controls { gap: 8px; padding-top: 14px; padding-bottom: 14px; }
   .seg { width: 100%; }
-  .seg button { flex: 1; padding: 10px 6px; }
-  .share { margin-left: 0; }
+  .seg button { flex: 1; padding: 9px 4px; font-size: 13px; }
+  .sel select { padding: 9px 28px 9px 12px; font-size: 13px; background-position: right 11px center; }
+  .share { margin-left: 0; padding: 9px 12px; font-size: 13px; }
   .row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; padding: 14px 0; }
   .row .rank { display: none; }
   .detail { padding-left: 0; }
   .name { font-size: 24px; }
   .amt { font-size: 40px; }
   .wk-head { padding: 28px var(--gutter) 16px; }
+  .wk-head h2 { font-size: 52px; }
+  .wk-head p { font-size: 15px; margin-top: 12px; }
   .cards { grid-template-columns: minmax(0, 1fr); }
   .card { padding: 20px; }
   .card-name { font-size: 40px; }
