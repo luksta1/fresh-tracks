@@ -494,10 +494,10 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 .leaflet-popup-content-wrapper { border: 1px solid var(--line-2); border-radius: 14px; }
 .pop b { display: block; font: 800 22px/1 var(--display); text-transform: uppercase; }
-.pop span { font: 400 11px var(--mono); color: var(--muted); text-transform: uppercase; }
+.pop > span { font: 400 11px var(--mono); color: var(--muted); text-transform: uppercase; }
 .pop .pop-amt { display: flex; align-items: flex-start; gap: 6px; font: 900 34px/1 var(--display); margin-top: 8px; }
 .pop .pop-amt .inch { font-size: 20px; }
-.pop em { font: 500 13px var(--body); font-style: normal; color: var(--muted); align-self: center; }
+.pop .pop-amt .tier { align-self: center; margin-left: 4px; }
 .pop .obs { font: 400 11px var(--mono); color: #8fc2ff; margin-top: 4px; }
 .pop-apres { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line-2); min-width: 220px; max-width: 260px; }
 .pop-label { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }

@@ -263,7 +263,7 @@ export function popupHtml(r, s, showObs) {
   if (!s) return `<div class="pop"><b>${r.name}</b></div>`;
   const obs = showObs && r.obs?.gain != null ? `<div class="obs">SNOTEL measured +${fmt(r.obs.gain)}″</div>` : "";
   return `<div class="pop"><b>${r.name}</b><span>${r.st} · summit ${ft(r.summit)} ft${r.meta ? ` · ${r.meta.lifts} lifts` : ""}</span>
-    <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${tierOf(s.score).name}</em></div>${obs}${apresHtml(r)}</div>`;
+    <div class="pop-amt">${fmt(s.snow)}${INCH}${tierPill(tierOf(s.score))}</div>${obs}${apresHtml(r)}</div>`;
 }
 
 // Google Maps search for a bar by name, resort and state. It always resolves, unlike a guessed

@@ -80,6 +80,7 @@ test("controlsHtml: window buttons only on the now view", () => {
 
 test("popupHtml", () => {
   assert.match(popupHtml(resort(), st(), false), /MT · summit 11,161 ft · 37 lifts/);
+  assert.match(popupHtml(resort(), st(), false), /class="pop-amt">9\.2[\s\S]*class="tier" style="--c:#eef3f7">[\s\S]*Deep<\/span>/, "colored tier pill with its glyph");
   assert.match(popupHtml(resort({ obs: { gain: 2 } }), st(), true), /SNOTEL measured \+2\.0″/);
   assert.equal(popupHtml(resort(), undefined, false), `<div class="pop"><b>Big Sky</b></div>`);
 });
