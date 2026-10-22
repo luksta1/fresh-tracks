@@ -6,13 +6,17 @@
      Config
      ============================================================ */
   const METEO = "https://api.open-meteo.com/v1/forecast";
-  const AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";
+  const AWDB = "https://wcc.sc.egov.usda.gov/awdbRestApi/services/v1";   // sends CORS headers, no proxy needed
+  // "main" drives every score. "alt" is a second opinion for the confidence badge.
+  // best_match picks the best regional model (GFS/HRRR in the US, GEM in Canada).
+  const MODELS = { main: "best_match", alt: "ecmwf_ifs025" };
   const PAST = 7;          // days of history requested
   const FUTURE = 8;        // days of forecast requested (today included)
   const TODAY = PAST;      // index of "today" in each resort's days array
   const FORECAST_TTL = 30 * 60 * 1000;
   const STATION_TTL = 7 * 24 * 3600 * 1000;
   const MAX_STATION_KM = 40;
+  const TIMEOUT = 20000;   // ms per request, so a stalled API shows an error instead of spinning
   const US = new Set(["CO", "UT", "WY", "MT", "ID", "NM", "AZ", "CA", "NV", "OR", "WA", "AK", "VT", "NH", "ME", "NY"]);
 
   // Score tiers use ski-trail signage: circle, square, diamond, double diamond.
@@ -50,6 +54,14 @@
     try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), data })); } catch (e) { /* ignore */ }
   };
 
+  // Short hash of the resort list, so editing resorts.js invalidates the forecast cache.
+  const hashStr = s => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  };
+  const DATA_VERSION = hashStr(JSON.stringify(window.RESORTS));
+
   function km(lat1, lon1, lat2, lon2) {
     const rad = Math.PI / 180;
     const a = Math.sin((lat2 - lat1) * rad / 2) ** 2 +
@@ -65,7 +77,7 @@
     qElev: Math.round(base + 0.7 * (summit - base)),
     midElev: base + 0.55 * (summit - base),
     us: US.has(st),
-    days: null,      // [{date, snow (in), tmax, tmin, wind}]
+    days: null,      // [{date, snow (in), snowAlt (in or null), tmax, tmin, wind}]
     station: null,   // nearest SNOTEL station
     obs: null        // {gain, depth} from SNOTEL
   }));
@@ -108,7 +120,25 @@
       ? ds.reduce((a, d) => a + avg(d) * d.snow, 0) / snow   // temperature on the snowy days
       : ds.reduce((a, d) => a + avg(d), 0) / ds.length;
     const wind = Math.max(...ds.map(d => d.wind));
-    return { snow, score, avgT, wind, ds };
+    const snowAlt = ds.every(d => d.snowAlt != null) ? ds.reduce((a, d) => a + d.snowAlt, 0) : null;
+    return { snow, snowAlt, score, avgT, wind, ds };
+  }
+
+  // Compare the two models' snow totals. Only worth showing when either expects real snow.
+  function confidence(st) {
+    if (st.snowAlt == null) return null;
+    const hi = Math.max(st.snow, st.snowAlt), lo = Math.min(st.snow, st.snowAlt);
+    if (hi < 2) return null;
+    const r = lo / hi;
+    if (r >= 0.6) return { t: "Models agree", c: "ok" };
+    if (r >= 0.3) return { t: "Models differ", c: "mid" };
+    return { t: "Models split", c: "split" };
+  }
+
+  function confBadge(st) {
+    const c = confidence(st);
+    if (!c) return "";
+    return `<span class="conf conf-${c.c}" title="Main model ${fmt(st.snow)}″, ECMWF ${fmt(st.snowAlt)}″">${c.t}<span class="conf-alt">ECMWF ${fmt(st.snowAlt)}″</span></span>`;
   }
 
   function blurb(st) {
@@ -125,18 +155,25 @@
   /* ============================================================
      Data: Open-Meteo forecasts
      ============================================================ */
+  // With several models, Open-Meteo suffixes each variable: snowfall_sum_best_match, etc.
+  // Snowfall is in cm; ECMWF occasionally reports tiny negatives, so floor at 0.
   function parseDaily(daily) {
+    const col = (v, m) => daily[`${v}_${MODELS[m]}`] || [];
+    const snow = col("snowfall_sum", "main"), alt = col("snowfall_sum", "alt");
+    const tmax = col("temperature_2m_max", "main"), tmin = col("temperature_2m_min", "main");
+    const wind = col("wind_speed_10m_max", "main");
     return daily.time.map((date, i) => ({
       date,
-      snow: (daily.snowfall_sum[i] || 0) / 2.54,   // cm -> inches
-      tmax: daily.temperature_2m_max[i] ?? 32,
-      tmin: daily.temperature_2m_min[i] ?? 32,
-      wind: daily.wind_speed_10m_max[i] ?? 0
+      snow: Math.max(0, snow[i] || 0) / 2.54,
+      snowAlt: alt[i] == null ? null : Math.max(0, alt[i]) / 2.54,
+      tmax: tmax[i] ?? 32,
+      tmin: tmin[i] ?? 32,
+      wind: wind[i] ?? 0
     }));
   }
 
   async function loadForecasts(force) {
-    const key = `ft:forecast:v1:${resorts.length}`;
+    const key = `ft:forecast:v2:${DATA_VERSION}`;
     if (!force) {
       const c = cacheGet(key, FORECAST_TTL);
       if (c && c.data.length === resorts.length) {
@@ -152,13 +189,14 @@
         longitude: part.map(r => r.lon).join(","),
         elevation: part.map(r => r.qElev).join(","),
         daily: "snowfall_sum,temperature_2m_max,temperature_2m_min,wind_speed_10m_max",
+        models: `${MODELS.main},${MODELS.alt}`,
         temperature_unit: "fahrenheit",
         wind_speed_unit: "mph",
         timezone: "auto",
         past_days: PAST,
         forecast_days: FUTURE
       });
-      const res = await fetch(`${METEO}?${params}`);
+      const res = await fetch(`${METEO}?${params}`, { signal: AbortSignal.timeout(TIMEOUT) });
       if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
       const json = await res.json();
       const list = Array.isArray(json) ? json : [json];
@@ -169,28 +207,23 @@
   }
 
   /* ============================================================
-     Data: SNOTEL (US snow depth)
-     Tries the Netlify function first (avoids CORS), then the public API directly.
+     Data: SNOTEL (US snow depth), straight from the AWDB REST API
      ============================================================ */
   async function snotelFetch(endpoint, params) {
-    try {
-      const qs = new URLSearchParams({ endpoint, ...params });
-      const res = await fetch(`/.netlify/functions/snotel?${qs}`);
-      if ((res.headers.get("content-type") || "").includes("json") && res.ok) return await res.json();
-    } catch (e) { /* fall through to direct */ }
-    const res = await fetch(`${AWDB}/${endpoint}?${new URLSearchParams(params)}`);
+    const res = await fetch(`${AWDB}/${endpoint}?${new URLSearchParams(params)}`, { signal: AbortSignal.timeout(TIMEOUT) });
     if (!res.ok) throw new Error(`SNOTEL returned ${res.status}`);
     return res.json();
   }
 
   async function loadStations() {
-    const c = cacheGet("ft:stations:v1", STATION_TTL);
+    const c = cacheGet("ft:stations:v2", STATION_TTL);
     if (c) return c.data;
-    const raw = await snotelFetch("stations", { networkCodes: "SNTL", activeOnly: "true" });
+    // The triplet wildcard is what limits this to SNOTEL; a networkCodes param is ignored.
+    const raw = await snotelFetch("stations", { stationTriplets: "*:*:SNTL", activeOnly: "true" });
     const list = raw
       .filter(s => s.latitude != null && s.longitude != null && s.elevation != null)
       .map(s => ({ id: s.stationTriplet, name: s.name, lat: s.latitude, lon: s.longitude, elev: s.elevation * 0.3048 }));
-    cacheSet("ft:stations:v1", list);
+    cacheSet("ft:stations:v2", list);
     return list;
   }
 
@@ -258,7 +291,7 @@
     try {
       state.updated = await loadForecasts(force);
     } catch (e) {
-      state.error = e.message;
+      state.error = e.name === "TimeoutError" ? "the forecast service timed out" : e.message;
       setStatus("Forecast failed", false);
       render();
       return;
@@ -266,6 +299,7 @@
     state.ready = true;
     buildMarkers();
     render();
+    if (filtered()) fitRegion(visibleResorts().map(r => r.id));
     setStatus(null, false);
     try {
       matchStations(await loadStations());
@@ -291,13 +325,18 @@
   /* ============================================================
      Map
      ============================================================ */
-  const map = L.map("map", { zoomControl: true }).setView([46, -108], 4);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-    attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    subdomains: "abcd",
-    maxZoom: 12
-  }).addTo(map);
-  const layer = L.layerGroup().addTo(map);
+  // If the Leaflet CDN fails, drop the map and keep the list working.
+  const map = window.L ? L.map("map", { zoomControl: true }).setView([46, -108], 4) : null;
+  if (map) {
+    // Standard OSM tiles (no key). styles.css desaturates them so the trail glyphs stand out.
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 12
+    }).addTo(map);
+  } else {
+    $("#mapwrap").hidden = true;
+  }
+  const layer = map && L.layerGroup().addTo(map);
   const markers = new Map();
 
   function markerIcon(score, snow, active) {
@@ -323,6 +362,7 @@
   }
 
   function buildMarkers() {
+    if (!map) return;
     layer.clearLayers();
     markers.clear();
     for (const r of resorts) {
@@ -334,6 +374,7 @@
   }
 
   function updateMarkers(visibleIds) {
+    if (!map) return;
     layer.clearLayers();
     for (const id of visibleIds) {
       const s = state.stats.get(id);
@@ -346,6 +387,7 @@
   }
 
   function fitRegion(ids) {
+    if (!map) return;
     const pts = ids.map(id => [resorts[id].lat, resorts[id].lon]);
     if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 7 });
   }
@@ -354,12 +396,13 @@
     state.active = id;
     document.querySelectorAll("[data-id]").forEach(el =>
       el.classList.toggle("active", Number(el.dataset.id) === id));
+    const el = document.querySelector(`[data-id="${id}"]`);
+    if (el && !fly) el.scrollIntoView({ block: "nearest" });
+    if (!map) return;
     const r = resorts[id];
     const m = markers.get(id);
     if (fly) map.flyTo([r.lat, r.lon], Math.max(map.getZoom(), 7), { duration: 0.6 });
     if (m) { m.openPopup(); }
-    const el = document.querySelector(`[data-id="${id}"]`);
-    if (el && !fly) el.scrollIntoView({ block: "nearest" });
     const s = state.stats.get(id);
     if (s) markers.forEach((mk, mid) => {
       const st = state.stats.get(mid);
@@ -405,14 +448,15 @@
     const passSelect = `<label class="sel"><span class="sr">Pass</span><select id="pass">${
       PASS_FILTERS.map(([v, l]) => `<option value="${v}"${v === state.pass ? " selected" : ""}>${l}</option>`).join("")
     }</select></label>`;
+    const share = `<button type="button" class="share" id="share">Copy link</button>`;
     let html = "";
     if (state.view === "now") {
       html = `<div class="seg" role="group" aria-label="Time window">${
         Object.entries(WINDOWS).map(([k, w]) =>
           `<button type="button" data-win="${k}" aria-pressed="${k === state.window}">${w.label}</button>`).join("")
-      }</div>` + select + passSelect;
+      }</div>` + select + passSelect + share;
     } else if (state.view === "weekend") {
-      html = select + passSelect;
+      html = select + passSelect + share;
     }
     $("#controls").innerHTML = html;
   }
@@ -433,9 +477,11 @@
       .map(r => ({ r, s: stats(r, w.idx) }))
       .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
     state.stats = new Map(rows.map(x => [x.r.id, x.s]));
+    // Past days get the SNOTEL measurement; forecast windows get the second-model check.
     const html = rows.map(({ r, s }) => {
-      const chip = state.window === "past3" && r.obs && r.obs.gain != null
-        ? `<span class="chip" title="Snow depth gain at ${r.station.name}">SNOTEL measured +${fmt(r.obs.gain)}″</span>` : "";
+      const chip = state.window !== "past3" ? confBadge(s)
+        : r.obs && r.obs.gain != null
+          ? `<span class="chip" title="Snow depth gain at ${r.station.name}">SNOTEL measured +${fmt(r.obs.gain)}″</span>` : "";
       return rowHtml(r, s, chip);
     }).join("");
     $("#content").innerHTML = rows.length ? `<ul class="list">${html}</ul>`
@@ -478,11 +524,11 @@
           <div class="snow"><b>${fmt(s.snow)}</b><small>in</small></div>
         </div>
         <div class="days">${cells}</div>
-        <p>${blurb(s)}</p>
+        <p>${blurb(s)}</p>${confBadge(s)}
       </button>`;
     }).join("");
 
-    const rest = (quiet ? rows : rows.slice(3)).map(({ r, s }) => rowHtml(r, s)).join("");
+    const rest = (quiet ? rows : rows.slice(3)).map(({ r, s }) => rowHtml(r, s, confBadge(s))).join("");
     $("#content").innerHTML = `
       <h2 class="when">${label(idx.sat)} and ${label(idx.sun)}</h2>
       ${quiet ? `<p class="note">Nothing worth chasing this weekend. Check back when storms start rolling in.</p>` : `<div class="cards">${cards}</div>`}
@@ -499,7 +545,7 @@
   function renderCheck() {
     if (state.snotel === "pending") { $("#content").innerHTML = `<p class="note">Loading SNOTEL observations…</p>`; return []; }
     if (state.snotel === "unavailable") {
-      $("#content").innerHTML = `<p class="note err">Couldn’t reach the SNOTEL service. Press Refresh to retry. If this keeps happening on your own host, deploy the included Netlify function, which proxies the request.</p>`;
+      $("#content").innerHTML = `<p class="note err">Couldn’t reach the SNOTEL service. It has occasional outages; press Refresh to retry.</p>`;
       return [];
     }
     const rows = resorts
@@ -537,6 +583,7 @@
   }
 
   function render() {
+    writeHash();
     document.querySelectorAll(".tabs button").forEach(b => {
       if (b.dataset.view === state.view) b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
@@ -555,7 +602,7 @@
     else if (state.view === "weekend") ids = renderWeekend();
     else ids = renderCheck();
 
-    if (state.view !== "check") {
+    if (state.view !== "check" && map) {
       updateMarkers(ids);
       setTimeout(() => map.invalidateSize(), 0);
     }
@@ -564,19 +611,61 @@
   /* ============================================================
      Events
      ============================================================ */
+  /* URL hash carries the view and any non-default filters, so a link reproduces the screen:
+     #weekend?region=Utah&pass=ikon or #now?win=next7 */
+  const VIEWS = ["now", "weekend", "check"];
+  const REGIONS = new Set(resorts.map(r => r.region));
+
+  function readHash() {
+    const [view, qs] = location.hash.slice(1).split("?");
+    const p = new URLSearchParams(qs || "");
+    state.view = VIEWS.includes(view) ? view : "now";
+    state.window = WINDOWS[p.get("win")] ? p.get("win") : "next3";
+    state.region = REGIONS.has(p.get("region")) ? p.get("region") : "All";
+    state.pass = PASS_FILTERS.some(([v]) => v === p.get("pass")) ? p.get("pass") : "All";
+  }
+
+  function writeHash() {
+    const p = new URLSearchParams();
+    if (state.view === "now" && state.window !== "next3") p.set("win", state.window);
+    if (state.region !== "All") p.set("region", state.region);
+    if (state.pass !== "All") p.set("pass", state.pass);
+    const qs = p.toString();
+    const hash = `#${state.view}${qs ? "?" + qs : ""}`;
+    if (location.hash !== hash) history.replaceState(null, "", hash);
+  }
+
+  const filtered = () => state.region !== "All" || state.pass !== "All";
+
   function setView(view) {
     state.view = view;
     state.active = null;
-    history.replaceState(null, "", "#" + view);
     render();
   }
+
+  window.addEventListener("hashchange", () => {
+    readHash();
+    render();
+    if (state.ready) fitRegion(visibleResorts().map(r => r.id));
+  });
 
   document.querySelector(".tabs").addEventListener("click", e => {
     const b = e.target.closest("button[data-view]");
     if (b) setView(b.dataset.view);
   });
 
-  $("#controls").addEventListener("click", e => {
+  $("#controls").addEventListener("click", async e => {
+    if (e.target.id === "share") {
+      const b = e.target;
+      try {
+        await navigator.clipboard.writeText(location.href);
+        b.textContent = "Link copied";
+      } catch (err) {
+        b.textContent = "Copy from the address bar";
+      }
+      setTimeout(() => { if (b.isConnected) b.textContent = "Copy link"; }, 1800);
+      return;
+    }
     const b = e.target.closest("button[data-win]");
     if (!b) return;
     state.window = b.dataset.win;
@@ -601,7 +690,6 @@
   /* ============================================================
      Go
      ============================================================ */
-  const hash = location.hash.slice(1);
-  if (["now", "weekend", "check"].includes(hash)) state.view = hash;
+  readHash();
   loadAll(false);
 })();

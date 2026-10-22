@@ -79,6 +79,9 @@ button { cursor: pointer; }
 #map { position: absolute; inset: 0; background: #e8eef1; }
 #app[data-view="check"] { grid-template-columns: 1fr; }
 #app[data-view="check"] #mapwrap { display: none; }
+/* Leaflet failed to load: the list takes the full width */
+#app:has(> #mapwrap[hidden]) { grid-template-columns: 1fr; }
+#app:has(> #mapwrap[hidden]) #panel,
 #app[data-view="check"] #panel { border-right: 0; padding: 20px max(16px, calc((100% - 960px) / 2)) 40px; }
 
 /* ---------- controls ---------- */
@@ -94,6 +97,15 @@ button { cursor: pointer; }
   background: var(--paper);
   padding: 7px 10px;
 }
+.share {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  padding: 7px 12px;
+  font-weight: 500;
+}
+.share:hover { border-color: var(--ink); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 .note { color: var(--muted); margin: 24px 0; }
@@ -150,6 +162,21 @@ button { cursor: pointer; }
   color: var(--ink);
   font-size: 12px;
 }
+/* second-model confidence badge */
+.conf {
+  display: inline-flex;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.conf-alt { font-weight: 400; opacity: .8; }
+.conf-ok { background: #dff3e7; color: #146a3b; }
+.conf-mid { background: #fdf1d4; color: #7a5a06; }
+.conf-split { background: #fde6d4; color: #8a3d0b; }
+.card .conf { margin-top: 10px; }
 .snow { text-align: right; font-family: var(--font-cond); line-height: 1; }
 .snow b { font-size: 28px; font-weight: 600; }
 .snow small { font-size: 14px; color: var(--muted); margin-left: 2px; }
@@ -233,6 +260,7 @@ td small { color: var(--muted); }
 .pop .big em { font: 500 14px var(--font); font-style: normal; color: var(--muted); margin-left: 4px; }
 .pop .obs { font-size: 12px; margin-top: 2px; }
 .leaflet-container { font-family: var(--font); }
+.leaflet-tile-pane { filter: grayscale(1) contrast(.85) brightness(1.08); }
 
 /* ---------- small screens ---------- */
 @media (max-width: 860px) {
