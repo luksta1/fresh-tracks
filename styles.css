@@ -499,8 +499,9 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .bar { padding: 12px var(--gutter); gap: 12px; }
   .brand { font-size: 24px; }
   .brand-mark i { width: 11px; height: 11px; }
-  .status { gap: 8px; }
-  .status #status { max-width: 22ch; }
+  .status { width: 100%; margin-left: 0; gap: 10px; }
+  .status #status { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status button { flex: none; }
   .tabs { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tabs button { padding: 11px 4px; font-size: 14px; }
   #app, #app[data-view] { display: flex; flex-direction: column; align-items: stretch; }
