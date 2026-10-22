@@ -2,7 +2,8 @@
    Returns null when Leaflet didn't load, so callers use map?.method(). */
 import { RUN_COLORS, TRAIL_ZOOM } from "./config.js";
 import { tierOf } from "./score.js";
-import { esc, slug } from "./util.js";
+import { slug } from "./util.js";
+import { trailTip } from "./views.js";
 
 export function createMap(el, { resorts, popup, onPick }) {
   const L = window.L;
@@ -92,12 +93,12 @@ export function createMap(el, { resorts, popup, onPick }) {
       const group = L.layerGroup();
       for (const [sign, name, pts] of runs) {
         const line = L.polyline(pts, { renderer, color: RUN_COLORS[sign] ?? RUN_COLORS[""], weight: sign ? 2.5 : 1.5, opacity: sign ? 0.9 : 0.5 });
-        if (name) line.bindTooltip(esc(name), tip);   // names come from OpenStreetMap, and tooltips render HTML
+        line.bindTooltip(trailTip("run", sign, name), tip);
         group.addLayer(line);
       }
       for (const [name, , pts] of lifts) {
         const line = L.polyline(pts, { renderer, color: RUN_COLORS.k, weight: 1.5, opacity: 0.75, dashArray: "5 4" });
-        line.bindTooltip(name ? `${esc(name)} · lift` : "Lift", tip);
+        line.bindTooltip(trailTip("lift", "", name), tip);
         group.addLayer(line);
       }
       trails.set(r.id, group);

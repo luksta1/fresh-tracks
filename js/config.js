@@ -37,4 +37,12 @@ export const PASS_FILTERS = [["All", "Any pass"], ["epic", "Epic"], ["ikon", "Ik
 
 // Trails draw from this zoom in; picking a resort flies a little closer than that.
 export const TRAIL_ZOOM = 11;
+// Run difficulty on the map. These reuse the trail-sign colors the powder tiers borrow, so the
+// legend switches to this key whenever trails are drawn.
 export const RUN_COLORS = { g: "#2fd07a", b: "#3b8bff", k: "#eef3f7", d: "#c6ff3d", "": "#5b6878" };
+export const RUNS = [
+  { sign: "g", name: "Easy", shape: "circle", n: 1 },
+  { sign: "b", name: "Intermediate", shape: "square", n: 1 },
+  { sign: "k", name: "Black diamond", shape: "diamond", n: 1 },
+  { sign: "d", name: "Double black", shape: "diamond", n: 2 }
+];

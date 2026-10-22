@@ -1,6 +1,6 @@
 /* HTML for each view. Pure functions: data in, markup out. Strings from outside this repo go
    through esc(); resort names and regions come from resorts.js. */
-import { PASS_FILTERS, TIERS, TODAY, WINDOWS } from "./config.js";
+import { PASS_FILTERS, RUN_COLORS, RUNS, TIERS, TODAY, WINDOWS } from "./config.js";
 import { blurb, confidence, tierOf } from "./score.js";
 import { esc, fmt, ft } from "./util.js";
 
@@ -60,9 +60,20 @@ const TOPO = `<svg class="topo" aria-hidden="true" viewBox="0 0 800 500" preserv
   }).join("")
 }</svg>`;
 
-export const legendHtml = () => TIERS.slice().reverse().map(t =>
-  `<span style="color:${t.hollow ? "" : t.color}">${glyph(t, 10)}${t.name}</span>`).join("") +
-  `<span class="hint-far">Zoom in for trails</span><span class="hint-near"><i class="lift-key"></i>Lift</span>`;
+// Two keys, because markers and runs share colors: zoomed out, markers by powder score; zoomed in
+// (trails drawn), runs by difficulty. CSS shows the one that matches the map.
+export const legendHtml = () =>
+  `<div class="legend-far"><b>Powder score</b>${TIERS.slice().reverse().map(t =>
+    `<span style="color:${t.hollow ? "" : t.color}">${glyph(t, 10)}${t.name}</span>`).join("")}<span class="hint">Zoom in for trails</span></div>` +
+  `<div class="legend-near"><b>Trail difficulty</b>${RUNS.map(r =>
+    `<span style="color:${RUN_COLORS[r.sign]}">${glyph({ ...r, color: RUN_COLORS[r.sign] }, 10)}${r.name}</span>`).join("")}<span><i class="lift-key"></i>Lift</span></div>`;
+
+// Hover text for a run or lift. Names come from OpenStreetMap, and Leaflet tooltips render HTML.
+export function trailTip(kind, sign, name) {
+  if (kind === "lift") return name ? `${esc(name)} · Lift` : "Lift";
+  const level = RUNS.find(r => r.sign === sign)?.name || "Unrated";
+  return name ? `${esc(name)} · ${level}` : `${level} run`;
+}
 
 export const note = (text, err) => `<p class="note${err ? " err" : ""}">${text}</p>`;
 

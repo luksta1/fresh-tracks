@@ -516,11 +516,12 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   text-transform: uppercase;
   color: var(--muted);
 }
+.legend > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.legend b { font-weight: 700; color: var(--text); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend .hint-far { color: var(--dim); }
-.legend .hint-near { display: none; }
-.trails-on .legend .hint-far { display: none; }
-.trails-on .legend .hint-near { display: inline-flex; }
+.legend .hint { color: var(--dim); }
+.legend-near, .trails-on .legend-far { display: none !important; }
+.trails-on .legend-near { display: flex !important; }
 .lift-key { display: block; width: 18px; border-top: 2px dashed var(--text); opacity: .75; }
 .leaflet-tooltip.trail-tip {
   background: var(--surface);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TODAY } from "../js/config.js";
-import { checkHtml, controlsHtml, dayStripHtml, heroHtml, mountainHtml, nowListHtml, passPill, popupHtml, skeletonHtml, weekendHtml } from "../js/views.js";
+import { checkHtml, controlsHtml, dayStripHtml, heroHtml, legendHtml, mountainHtml, nowListHtml, passPill, popupHtml, skeletonHtml, trailTip, weekendHtml } from "../js/views.js";
 
 const resort = (over = {}) => ({
   id: 0, name: "Big Sky", st: "MT", region: "N. Rockies", pass: "ikon", base: 2077, summit: 3402,
@@ -109,4 +109,23 @@ test("skeletonHtml: placeholder hero and rows, hidden from screen readers but an
   assert.equal((sk.content.match(/class="skel-row"/g) || []).length, 8);
   assert.match(sk.content, /<p class="sr">Loading forecasts for 67 resorts…<\/p>/);
   assert.equal(skeletonHtml("check", 67).hero, "");
+});
+
+test("legendHtml: separate keys for powder (markers) and difficulty (runs)", () => {
+  const html = legendHtml();
+  const far = html.match(/<div class="legend-far">[\s\S]*?<\/div>/)[0];
+  const near = html.match(/<div class="legend-near">[\s\S]*?<\/div>/)[0];
+  assert.match(far, /Powder score[\s\S]*Quiet[\s\S]*Send it[\s\S]*Zoom in for trails/);
+  assert.ok(!/Easy|Intermediate|Lift/.test(far), "no difficulty terms in the powder key");
+  assert.match(near, /Trail difficulty[\s\S]*Easy[\s\S]*Intermediate[\s\S]*Black diamond[\s\S]*Double black[\s\S]*Lift/);
+  assert.ok(!/Deep|Send it|Quiet/.test(near), "no powder terms in the trail key");
+});
+
+test("trailTip: names with difficulty, escaped", () => {
+  assert.equal(trailTip("run", "b", "Three Moons"), "Three Moons · Intermediate");
+  assert.equal(trailTip("run", "d", ""), "Double black run");
+  assert.equal(trailTip("run", "", "Cat track"), "Cat track · Unrated");
+  assert.equal(trailTip("lift", "", "Swift Current"), "Swift Current · Lift");
+  assert.equal(trailTip("lift", "", ""), "Lift");
+  assert.equal(trailTip("run", "k", "<img onerror=x>"), "&lt;img onerror=x&gt; · Black diamond");
 });
