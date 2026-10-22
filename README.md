@@ -41,6 +41,7 @@ data: every resort well-formed, matched in `resort-meta.js`, and with a trails f
 | `index.html` | Page shell; loads Leaflet from a CDN, then `js/main.js` |
 | `styles.css` | The whole look |
 | `resorts.js` | Hand-edited resort list |
+| `apres.js` | Hand-edited après picks |
 | `resort-meta.js`, `trails/` | Generated from OpenSkiMap by `scripts/` |
 | `js/main.js` | State, rendering, events, startup |
 | `js/data.js` | Resort setup, Open-Meteo and SNOTEL loading, local cache |
@@ -59,6 +60,10 @@ Any static host works. On Netlify, `netlify.toml` sets the publish directory to 
 ## Customize
 
 - `resorts.js`: add or remove resorts (name, state, region, lat, lon, base m, summit m, pass). Pass is `ikon`, `epic`, `epic-limited` (with a note like "7 days"), or `none`. Tags match the 2026/27 pass lists; recheck each fall. Editing this file invalidates the forecast cache automatically.
+- `apres.js`: up to three après picks per resort, shown in its map popup with a Google Maps link.
+  Hand-edited: `[name, where, note?]`. The first draft covers about half the resorts with
+  long-running spots only; fill in the rest and check the old ones each season. `npm test` catches
+  typos in resort names.
 - `resort-meta.js`: generated, don't edit. After changing `resorts.js` (and once a season), run
   `npm run enrich` to refresh it. It prints each match so you can spot a wrong one;
   fix those with `OVERRIDES` at the top of the script.

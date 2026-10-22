@@ -129,3 +129,16 @@ test("trailTip: names with difficulty, escaped", () => {
   assert.equal(trailTip("lift", "", ""), "Lift");
   assert.equal(trailTip("run", "k", "<img onerror=x>"), "&lt;img onerror=x&gt; · Black diamond");
 });
+
+test("popupHtml: après picks with escaped names and Maps links", () => {
+  const r = resort({ apres: [["Mangy Moose", "Teton Village", "3:30 or no table"], [`<b>Bad"Bar`, "Town"]] });
+  const html = popupHtml(r, st(), false);
+  assert.match(html, /class="pop-label">Après/);
+  assert.match(html, /href="https:\/\/www\.google\.com\/maps\/search\/\?api=1&query=Mangy%20Moose%2C%20Teton%20Village" target="_blank" rel="noopener">Mangy Moose<\/a>/);
+  assert.match(html, /Teton Village · 3:30 or no table/);
+  assert.ok(!html.includes(`<b>Bad"Bar`), "names are escaped");
+  assert.match(html, /&lt;b&gt;Bad&quot;Bar/);
+  const many = resort({ apres: [["A", "x"], ["B", "x"], ["C", "x"], ["D", "x"]] });
+  assert.equal((popupHtml(many, st(), false).match(/<li>/g) || []).length, 3, "three at most");
+  assert.match(popupHtml(resort({ apres: [] }), st(), false), /No picks yet/);
+});

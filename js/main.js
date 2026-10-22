@@ -1,6 +1,7 @@
 /* Fresh Tracks: state, rendering and events. No build step, no framework. */
 import { RESORTS } from "../resorts.js";
 import { RESORT_META } from "../resort-meta.js";
+import { APRES } from "../apres.js";
 import { TODAY, WEEKEND_WEIGHTS, WINDOWS } from "./config.js";
 import { buildResorts, loadForecasts, loadObservations, loadStations, matchStations } from "./data.js";
 import { createMap } from "./map.js";
@@ -11,7 +12,7 @@ import * as V from "./views.js";
 
 const $ = s => document.querySelector(s);
 
-const resorts = buildResorts(RESORTS, RESORT_META);
+const resorts = buildResorts(RESORTS, RESORT_META, APRES);
 const REGIONS = [...new Set(resorts.map(r => r.region))];
 // Editing resorts.js or regenerating resort-meta.js invalidates the forecast cache.
 const DATA_VERSION = hashStr(JSON.stringify([RESORTS, RESORT_META]));

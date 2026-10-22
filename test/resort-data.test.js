@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
+import { APRES } from "../apres.js";
 import { RESORT_META } from "../resort-meta.js";
 import { RESORTS } from "../resorts.js";
 import { km, slug } from "../js/util.js";
@@ -54,5 +55,18 @@ test("trails/: one valid file per resort, nothing extra", () => {
     // Spot-check that the lines are actually at the resort.
     const [lat, lon] = runs[0][2][0];
     assert.ok(km(lat, lon, m.lat, m.lon) < 20, `${name} trails are near the resort`);
+  }
+});
+
+test("apres.js: keyed by real resorts, up to three well-formed picks each", () => {
+  const names = new Set(RESORTS.map(r => r[0]));
+  for (const [resort, picks] of Object.entries(APRES)) {
+    assert.ok(names.has(resort), `"${resort}" isn't a resort in resorts.js`);
+    assert.ok(Array.isArray(picks) && picks.length >= 1 && picks.length <= 3, `${resort}: 1 to 3 picks`);
+    for (const [name, where, note] of picks) {
+      assert.ok(typeof name === "string" && name.trim(), `${resort}: pick needs a name`);
+      assert.ok(typeof where === "string" && where.trim(), `${resort} / ${name}: needs a where`);
+      assert.ok(note === undefined || typeof note === "string");
+    }
   }
 });

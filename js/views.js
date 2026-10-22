@@ -263,5 +263,18 @@ export function popupHtml(r, s, showObs) {
   if (!s) return `<div class="pop"><b>${r.name}</b></div>`;
   const obs = showObs && r.obs?.gain != null ? `<div class="obs">SNOTEL measured +${fmt(r.obs.gain)}″</div>` : "";
   return `<div class="pop"><b>${r.name}</b><span>${r.st} · summit ${ft(r.summit)} ft${r.meta ? ` · ${r.meta.lifts} lifts` : ""}</span>
-    <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${tierOf(s.score).name}</em></div>${obs}</div>`;
+    <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${tierOf(s.score).name}</em></div>${obs}${apresHtml(r)}</div>`;
+}
+
+// Google Maps search for a bar: always resolves, unlike a guessed website URL.
+export const mapsLink = (name, where) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${where}`)}`;
+
+// Après picks from apres.js, which people edit by hand, so everything is escaped.
+function apresHtml(r) {
+  if (!r.apres?.length) return `<div class="pop-apres"><div class="pop-label">Après</div><p class="pop-none">No picks yet. Add some in apres.js.</p></div>`;
+  return `<div class="pop-apres"><div class="pop-label">Après</div><ol>${r.apres.slice(0, 3).map(([name, where, note]) => `<li>
+      <a href="${mapsLink(name, where)}" target="_blank" rel="noopener">${esc(name)}</a>
+      <small>${esc(where)}${note ? ` · ${esc(note)}` : ""}</small>
+    </li>`).join("")}</ol></div>`;
 }
