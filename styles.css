@@ -210,6 +210,22 @@ button { cursor: pointer; }
 .stats .split { color: #ff9a6b; }
 .hero.quiet .big { color: var(--dim); }
 
+/* ---------- mountain facts + trail mix ---------- */
+:root { --mix-green: var(--green); --mix-blue: var(--blue); --mix-black: var(--text); --mix-double: var(--accent); }
+.mountain { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+.facts { font: 400 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.mix { display: flex; flex-direction: column; gap: 6px; }
+.mix-bar { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; }
+.mix-bar i { display: block; min-width: 3px; }
+.mix-green { background: var(--mix-green); }
+.mix-blue { background: var(--mix-blue); }
+.mix-black { background: var(--mix-black); }
+.mix-double { background: var(--mix-double); }
+.mix-keys { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 400 11px var(--mono); color: var(--muted); }
+.mix-keys > span { display: inline-flex; align-items: center; gap: 6px; }
+.card .mountain { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+.credit a { color: inherit; }
+
 /* ---------- pills ---------- */
 .tier {
   display: inline-flex;

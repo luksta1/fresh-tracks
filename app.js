@@ -61,7 +61,9 @@
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     return (h >>> 0).toString(36);
   };
-  const DATA_VERSION = hashStr(JSON.stringify(window.RESORTS));
+  // OpenSkiMap facts from scripts/enrich-resorts.mjs. Optional: without the file, resorts.js stands alone.
+  const META = window.RESORT_META || {};
+  const DATA_VERSION = hashStr(JSON.stringify([window.RESORTS, META]));
 
   function km(lat1, lon1, lat2, lon2) {
     const rad = Math.PI / 180;
@@ -73,15 +75,23 @@
   /* ============================================================
      State
      ============================================================ */
-  const resorts = window.RESORTS.map(([name, st, region, lat, lon, base, summit, pass, passNote], id) => ({
-    id, name, st, region, lat, lon, base, summit, pass: pass || "none", passNote,
-    qElev: Math.round(base + 0.7 * (summit - base)),
-    midElev: base + 0.55 * (summit - base),
-    us: US.has(st),
-    days: null,      // [{date, snow (in), snowAlt (in or null), tmax, tmin, wind}]
-    station: null,   // nearest SNOTEL station
-    obs: null        // {gain, depth} from SNOTEL
-  }));
+  const resorts = window.RESORTS.map(([name, st, region, lat, lon, base, summit, pass, passNote], id) => {
+    const m = META[name] || null;
+    if (m) {
+      ({ lat, lon } = m);
+      if (m.base != null) ({ base, summit } = m);
+    }
+    return {
+      id, name, st, region, lat, lon, base, summit, pass: pass || "none", passNote,
+      meta: m,         // {lifts, mix: {green, blue, black, double} as % of trail length, runKm, url}
+      qElev: Math.round(base + 0.7 * (summit - base)),
+      midElev: base + 0.55 * (summit - base),
+      us: US.has(st),
+      days: null,      // [{date, snow (in), snowAlt (in or null), tmax, tmin, wind}]
+      station: null,   // nearest SNOTEL station
+      obs: null        // {gain, depth} from SNOTEL
+    };
+  });
 
   const state = {
     view: "now",
@@ -331,7 +341,7 @@
   if (map) {
     // Standard OSM tiles (no key). styles.css inverts and dims them into a night map.
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · resorts <a href="https://openskimap.org">OpenSkiMap</a>',
       maxZoom: 12
     }).addTo(map);
   } else {
@@ -358,7 +368,7 @@
     const t = tierOf(s.score);
     const obs = state.view === "now" && state.window === "past3" && r.obs && r.obs.gain != null
       ? `<div class="obs">SNOTEL measured +${fmt(r.obs.gain)}″</div>` : "";
-    return `<div class="pop"><b>${r.name}</b><span>${r.st} · summit ${ft(r.summit)} ft</span>
+    return `<div class="pop"><b>${r.name}</b><span>${r.st} · summit ${ft(r.summit)} ft${r.meta ? ` · ${r.meta.lifts} lifts` : ""}</span>
       <div class="pop-amt">${fmt(s.snow)}${INCH}<em>${t.name}</em></div>${obs}</div>`;
   }
 
@@ -425,6 +435,21 @@
   // Tier pill: the tier's own color as the fill, with a dark glyph on it.
   const tierPill = t =>
     `<span class="tier${t.hollow ? " hollow" : ""}" style="--c:${t.color}">${glyph(t, 10, t.hollow ? t.color : "#0e1622")}${t.name}</span>`;
+
+  // The mountain itself: lifts, vertical, trail length, and the green/blue/black mix by length.
+  const MIX = [["green", "circle"], ["blue", "square"], ["black", "diamond"], ["double", "diamond"]];
+  function mountainHtml(r) {
+    const m = r.meta;
+    if (!m) return "";
+    const facts = [`${m.lifts} lifts`, `${ft(r.summit - r.base)} ft vert`, m.runKm ? `${m.runKm} km of runs` : ""].filter(Boolean);
+    const mix = m.mix ? `<span class="mix" role="img" aria-label="Trail mix by length: ${
+        MIX.map(([k]) => `${m.mix[k]}% ${k === "double" ? "double black" : k}`).join(", ")}">
+        <span class="mix-bar" aria-hidden="true">${MIX.map(([k]) => m.mix[k] ? `<i class="mix-${k}" style="flex:${m.mix[k]}"></i>` : "").join("")}</span>
+        <span class="mix-keys" aria-hidden="true">${MIX.filter(([k]) => m.mix[k]).map(([k, shape]) =>
+          `<span>${glyph({ shape, n: k === "double" ? 2 : 1, color: `var(--mix-${k})` }, 8)}${m.mix[k]}%</span>`).join("")}</span>
+      </span>` : "";
+    return `<div class="mountain"><span class="facts">${facts.join(" · ")}</span>${mix}</div>`;
+  }
 
   // Contour lines behind the hero. Decoration only.
   const TOPO = `<svg class="topo" aria-hidden="true" viewBox="0 0 800 500" preserveAspectRatio="none">${
@@ -518,6 +543,7 @@
           <div class="hero-tags">${tierPill(t)}${passPill(r)}<span class="st">${r.st}</span></div>
         </div>
       </div>
+      ${mountainHtml(r)}
       <div class="stats">
         ${stat("Avg temp", `${Math.round(s.avgT)}°F`)}
         ${stat("Wind to", `${Math.round(s.wind)} mph`)}
@@ -586,6 +612,7 @@
         <span class="card-mid"><span class="card-name">${r.name}</span>${amt(s.snow)}</span>
         <span class="days">${cells}</span>
         <span class="blurb">${blurb(s)}</span>${confBadge(s)}
+        ${mountainHtml(r).replace(/<(\/?)div/g, "<$1span")}
       </button>`;
     }).join("");
 

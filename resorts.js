@@ -71,7 +71,7 @@ window.RESORTS = [
   ["Killington", "VT", "Northeast", 43.6045, -72.8201, 340, 1291, "ikon"],
   ["Sugarbush", "VT", "Northeast", 44.1360, -72.9030, 490, 1245, "ikon"],
   ["Loon Mountain", "NH", "Northeast", 44.0364, -71.6215, 305, 930, "ikon"],
-  ["Sugarloaf", "ME", "Northeast", 45.0314, -70.8631, 430, 1291, "ikon"],
+  ["Sugarloaf", "ME", "Northeast", 45.0490, -70.3158, 430, 1291, "ikon"],
   ["Sunday River", "ME", "Northeast", 44.4733, -70.8561, 235, 975, "ikon"],
   ["Whiteface", "NY", "Northeast", 44.3659, -73.9026, 370, 1350, "none"],
 
