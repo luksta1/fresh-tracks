@@ -1,11 +1,13 @@
 /* HTML for each view. Pure functions: data in, markup out. Strings from outside this repo go
    through esc(); resort names and regions come from resorts.js. */
-import { PASS_FILTERS, TIERS, WINDOWS } from "./config.js";
+import { PASS_FILTERS, TIERS, TODAY, WINDOWS } from "./config.js";
 import { blurb, confidence, tierOf } from "./score.js";
 import { esc, fmt, ft } from "./util.js";
 
 export const INCH = `<span class="inch">″</span>`;
 const amt = n => `<span class="amt">${fmt(n)}${INCH}</span>`;
+const dateOf = d => new Date(d.date + "T12:00:00");
+const dow = d => dateOf(d).toLocaleDateString("en-US", { weekday: "short" });
 
 /* ---------- small parts ---------- */
 
@@ -84,10 +86,11 @@ export function controlsHtml(state, regions) {
 
 /* ---------- ranked list ---------- */
 
-export function rowHtml(r, s, rank, active, extra = "") {
+// A ranked row. The active row also shows its day-by-day strip; `hot` is the days being scored.
+export function rowHtml(r, s, rank, active, extra = "", hot = []) {
   const t = tierOf(s.score);
   const meta = `${r.st} · ${t.name} · avg ${Math.round(s.avgT)}°F · wind ${Math.round(s.wind)} mph`;
-  return `<li><button type="button" class="row${active ? " active" : ""}" data-id="${r.id}">
+  return `<li><button type="button" class="row${active ? " active" : ""}" data-id="${r.id}" aria-expanded="${active}">
     <span class="rank">${String(rank).padStart(2, "0")}</span>
     ${glyph(t, 16)}
     <span class="who">
@@ -96,7 +99,32 @@ export function rowHtml(r, s, rank, active, extra = "") {
       <span class="bar-track" aria-hidden="true"><span class="bar-fill" style="--w:${Math.round(s.score)}%"></span></span>
     </span>
     ${amt(s.snow)}
-  </button></li>`;
+  </button>${active ? dayStripHtml(r, hot) : ""}</li>`;
+}
+
+// Day-by-day snowfall: the past 3 days, today and the next 6. Bars share one scale per resort;
+// the dashed outline behind each is ECMWF's amount. `hot` days (the ones the view scores) are lit.
+export function dayStripHtml(r, hot = []) {
+  const idx = Array.from({ length: 10 }, (_, k) => TODAY - 3 + k);
+  const days = idx.map(i => r.days[i]);
+  const top = Math.max(4, ...days.flatMap(d => [d.snow, d.snowAlt ?? 0]));
+  const h = v => `${Math.round(100 * v / top)}%`;
+  const cells = idx.map((i, k) => {
+    const d = days[k];
+    const cls = [i < TODAY && "past", hot.includes(i) && "hot"].filter(Boolean).join(" ");
+    const alt = d.snowAlt == null ? "" : `<i class="alt" style="height:${h(d.snowAlt)}"></i>`;
+    return `<li${cls ? ` class="${cls}"` : ""}>
+      <span class="d-amt">${fmt(d.snow)}″</span>
+      <span class="d-bars" aria-hidden="true">${alt}<i class="main" style="height:${h(d.snow)}"></i></span>
+      <span class="d-day">${i === TODAY ? "Today" : dow(d)}</span>
+      <span class="d-temp">${Math.round(d.tmin)}–${Math.round(d.tmax)}°</span>${
+      d.snowAlt == null ? "" : `<span class="sr">ECMWF ${fmt(d.snowAlt)}″</span>`}
+    </li>`;
+  }).join("");
+  return `<div class="detail">
+    <ol class="strip" aria-label="Snowfall by day at ${r.name}">${cells}</ol>
+    <p class="strip-key"><span><i class="k-main"></i>Main model</span><span><i class="k-alt"></i>ECMWF</span><span class="k-past">Dashed: past days</span></p>
+  </div>`;
 }
 
 /* ---------- right now ---------- */
@@ -142,13 +170,10 @@ export function nowListHtml(rows, windowKey, activeId) {
   if (!rows.length) return note("No resorts match these filters. Try a different region or pass.");
   // Past days get the SNOTEL measurement; forecast windows get the second-model check.
   return `<ol class="list">${rows.map(({ r, s }, i) =>
-    rowHtml(r, s, i + 1, r.id === activeId, windowKey === "past3" ? snotelChip(r) : confBadge(s))).join("")}</ol>`;
+    rowHtml(r, s, i + 1, r.id === activeId, windowKey === "past3" ? snotelChip(r) : confBadge(s), WINDOWS[windowKey].idx)).join("")}</ol>`;
 }
 
 /* ---------- this weekend ---------- */
-
-const dateOf = d => new Date(d.date + "T12:00:00");
-const dow = d => dateOf(d).toLocaleDateString("en-US", { weekday: "short" });
 
 export function weekendHeadHtml(days, idx) {
   const sat = days[idx.sat], sun = days[idx.sun];
@@ -179,7 +204,7 @@ export function weekendHtml(rows, dayIdx, activeId) {
   }).join("");
   const restRows = quiet ? rows : rows.slice(3);
   const offset = quiet ? 1 : 4;
-  const rest = restRows.map(({ r, s }, i) => rowHtml(r, s, i + offset, r.id === activeId, confBadge(s))).join("");
+  const rest = restRows.map(({ r, s }, i) => rowHtml(r, s, i + offset, r.id === activeId, confBadge(s), dayIdx)).join("");
   return {
     picks: quiet ? note("Nothing worth chasing this weekend. Check back when storms start rolling in.") : `<div class="cards">${cards}</div>`,
     rest: rest ? `<h3 class="rest-title">${quiet ? "All resorts" : "Also in the running"}</h3><ol class="list">${rest}</ol>` : ""

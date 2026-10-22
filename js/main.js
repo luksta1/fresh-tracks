@@ -23,6 +23,7 @@ const state = {
   snotel: "pending",   // pending | ok | unavailable
   updated: null,
   stats: new Map(),    // resort id -> stats for whatever the current view scores
+  hot: [],             // day indices the current view scores, lit in the day-by-day strip
   active: null
 };
 
@@ -43,7 +44,8 @@ const ranked = (idx, weights) => visible()
   .sort((a, b) => b.s.score - a.s.score || b.s.snow - a.s.snow);
 
 function renderNow() {
-  const rows = ranked(WINDOWS[state.window].idx);
+  state.hot = WINDOWS[state.window].idx;
+  const rows = ranked(state.hot);
   state.stats = new Map(rows.map(x => [x.r.id, x.s]));
   $("#hero").innerHTML = V.heroHtml(rows[0], state.window, rows.length);
   $("#content").innerHTML = V.nowListHtml(rows, state.window, state.active);
@@ -54,6 +56,7 @@ function renderWeekend() {
   const days = resorts[0].days;
   const idx = weekendIdx(days);
   const dayIdx = [idx.fri, idx.sat, idx.sun];
+  state.hot = dayIdx;
   const rows = ranked(dayIdx, WEEKEND_WEIGHTS);
   state.stats = new Map(rows.map(x => [x.r.id, x.s]));
   const { picks, rest } = V.weekendHtml(rows, dayIdx, state.active);
@@ -104,17 +107,39 @@ function render() {
 
   if (state.view === "check") renderCheck();
   else map?.setMarkers(state.view === "now" ? renderNow() : renderWeekend(), state.stats, state.active);
+  stripToToday();
 
   // The map changes size between views (sticky column, weekend strip, hidden on check).
   if (state.view !== lastView) setTimeout(() => map?.resize(), 0);
   lastView = state.view;
 }
 
+// On a phone the strip scrolls sideways; start it at today rather than three days back.
+function stripToToday() {
+  const strip = document.querySelector(".strip");
+  const today = strip?.children[3];
+  if (today && strip.scrollWidth > strip.clientWidth) {
+    strip.scrollLeft = today.getBoundingClientRect().left - strip.getBoundingClientRect().left + strip.scrollLeft;
+  }
+}
+
+// Pick a resort: highlight it, open its row's day-by-day strip, and show it on the map.
+// Clicking the open row again closes the strip.
 function select(id, fly) {
-  state.active = id;
-  document.querySelectorAll("[data-id]").forEach(el => el.classList.toggle("active", Number(el.dataset.id) === id));
-  if (!fly) document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: "nearest" });
-  map?.setActive(id);
+  const row = document.querySelector(`.row[data-id="${id}"]`);
+  const closing = fly && state.active === id && row?.getAttribute("aria-expanded") === "true";
+  state.active = closing ? null : id;
+  document.querySelectorAll("[data-id]").forEach(el => el.classList.toggle("active", Number(el.dataset.id) === state.active));
+  document.querySelector(".detail")?.remove();
+  document.querySelectorAll(".row[aria-expanded=true]").forEach(el => el.setAttribute("aria-expanded", "false"));
+  map?.setActive(state.active);
+  if (closing) return;
+  if (row) {
+    row.setAttribute("aria-expanded", "true");
+    row.parentElement.insertAdjacentHTML("beforeend", V.dayStripHtml(resorts[id], state.hot));
+    stripToToday();
+    if (!fly) row.parentElement.scrollIntoView({ block: "nearest" });
+  }
   map?.focus(id, fly);
 }
 

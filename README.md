@@ -3,7 +3,8 @@
 A personal powder tracker for 67 North American ski resorts. Static site: no build step, no
 server code, no dependencies.
 
-- **Right now**: ranked list and map by powder score (past 3 days, next 3 days, next 7 days)
+- **Right now**: ranked list and map by powder score (past 3 days, next 3 days, next 7 days).
+  Click a resort to open its day-by-day snowfall for the past 3 days, today and the next 6.
 - **This weekend**: top 3 picks for Fri/Sat/Sun with a plain-English reason
 - **Model check**: modeled snowfall vs. measured SNOTEL snow depth gains (US only)
 

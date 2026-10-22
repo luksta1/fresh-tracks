@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkHtml, controlsHtml, heroHtml, mountainHtml, nowListHtml, passPill, popupHtml, weekendHtml } from "../js/views.js";
+import { TODAY } from "../js/config.js";
+import { checkHtml, controlsHtml, dayStripHtml, heroHtml, mountainHtml, nowListHtml, passPill, popupHtml, weekendHtml } from "../js/views.js";
 
 const resort = (over = {}) => ({
   id: 0, name: "Big Sky", st: "MT", region: "N. Rockies", pass: "ikon", base: 2077, summit: 3402,
@@ -39,9 +40,11 @@ test("heroHtml: ECMWF check for forecasts, SNOTEL for past days", () => {
 test("nowListHtml: ranks, badges, empty state", () => {
   const rows = [{ r: resort(), s: st() }, { r: resort({ id: 1, name: "Alta" }), s: st({ snow: 1, snowAlt: 1, score: 10 }) }];
   const html = nowListHtml(rows, "next3", 1);
-  assert.equal((html.match(/<li>/g) || []).length, 2);
+  assert.equal((html.match(/class="row[ "]/g) || []).length, 2);
   assert.match(html, /class="rank">01</);
-  assert.match(html, /class="row active" data-id="1"/);
+  assert.match(html, /class="row active" data-id="1" aria-expanded="true"/);
+  assert.match(html, /data-id="0" aria-expanded="false"/);
+  assert.equal((html.match(/class="detail"/g) || []).length, 1, "only the active row opens its strip");
   assert.match(html, /Models agree/);
   assert.match(nowListHtml([], "next3", null), /No resorts match/);
 });
@@ -79,4 +82,23 @@ test("popupHtml", () => {
   assert.match(popupHtml(resort(), st(), false), /MT · summit 11,161 ft · 37 lifts/);
   assert.match(popupHtml(resort({ obs: { gain: 2 } }), st(), true), /SNOTEL measured \+2\.0″/);
   assert.equal(popupHtml(resort(), undefined, false), `<div class="pop"><b>Big Sky</b></div>`);
+});
+
+test("dayStripHtml: past 3 days, today, next 6, one scale, scored days lit", () => {
+  const days = Array.from({ length: 15 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 9, 15 + i)).toISOString().slice(0, 10),
+    snow: i === TODAY + 1 ? 8 : 1, snowAlt: i === TODAY + 1 ? 2 : null, tmax: 30, tmin: 18, wind: 10
+  }));
+  const html = dayStripHtml(resort({ days }), [TODAY, TODAY + 1, TODAY + 2]);
+  const cells = html.match(/<li[^>]*>[\s\S]*?<\/li>/g);
+  assert.equal(cells.length, 10);
+  assert.equal(cells.filter(c => c.startsWith('<li class="past')).length, 3);
+  assert.equal(cells.filter(c => /^<li class="(past )?hot"/.test(c)).length, 3);
+  assert.match(cells[3], /class="d-day">Today</);
+  assert.match(cells[4], /8\.0″[\s\S]*height:100%[\s\S]*ECMWF 2\.0″/, "the biggest day sets the scale");
+  assert.match(cells[4], /class="alt" style="height:25%"/);
+  assert.match(cells[5], /height:13%/, "1 in on an 8 in scale");
+  assert.ok(!cells[5].includes('class="alt"'), "no ECMWF bar when it's missing");
+  assert.match(html, /18–30°/);
+  assert.match(dayStripHtml(resort(), []), /height:50%/, "small days still use a 4 in floor so 2 in isn't a full bar");
 });

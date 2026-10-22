@@ -314,6 +314,46 @@ button { cursor: pointer; }
 .amt { display: flex; align-items: flex-start; font: 900 56px/1 var(--display); }
 .amt .inch { color: var(--dim); }
 
+/* day-by-day strip under the open row */
+.detail { padding: 0 0 22px 106px; }
+.strip {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(46px, 1fr));
+  gap: 6px;
+  max-width: 640px;
+  overflow-x: auto;
+}
+.strip li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.strip li.past { background: transparent; border-style: dashed; }
+.past .d-amt { color: var(--muted); }
+.strip li.hot { border-color: var(--line-2); }
+.d-amt { font: 800 18px/1 var(--display); }
+.d-bars { position: relative; width: 14px; height: 64px; }
+.d-bars i { position: absolute; bottom: 0; left: 0; right: 0; min-height: 2px; border-radius: 3px 3px 0 0; }
+.d-bars .main { background: var(--muted); }
+.hot .d-bars .main { background: var(--accent); }
+.d-bars .alt { left: -4px; right: -4px; border: 1px dashed var(--text); border-bottom: 0; opacity: .5; }
+.d-day { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.hot .d-day { color: var(--text); }
+.d-temp { font: 400 10px var(--mono); color: var(--muted); white-space: nowrap; }
+.strip-key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 10px 0 0; font: 400 11px var(--mono); text-transform: uppercase; color: var(--muted); }
+.strip-key span { display: inline-flex; align-items: center; gap: 6px; }
+.strip-key i { display: block; width: 10px; height: 10px; border-radius: 2px; }
+.k-main { background: var(--accent); }
+.k-alt { border: 1px dashed var(--text); opacity: .6; }
+
 /* ---------- weekend ---------- */
 .wk-head {
   padding: 56px var(--gutter) 28px;
@@ -482,6 +522,7 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .share { margin-left: 0; }
   .row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; padding: 14px 0; }
   .row .rank { display: none; }
+  .detail { padding-left: 0; }
   .name { font-size: 24px; }
   .amt { font-size: 40px; }
   .wk-head { padding: 28px var(--gutter) 16px; }
