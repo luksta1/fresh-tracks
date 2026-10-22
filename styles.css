@@ -95,6 +95,46 @@ button { cursor: pointer; }
 .status button:hover, .ghost:hover { border-color: var(--text); }
 .status button:disabled { opacity: .5; cursor: progress; }
 
+/* ---------- loading ---------- */
+/* A slim bar slides along the bottom of the header and the status dot pulses while anything loads. */
+.bar { position: relative; overflow: hidden; }
+.bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 30%;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: opacity .2s;
+}
+body.busy .bar::after { opacity: 1; animation: slide 1.1s ease-in-out infinite; }
+body.busy .dot { animation: pulse .8s ease-in-out infinite alternate; }
+@keyframes slide { to { transform: translateX(340%); } }
+@keyframes pulse { to { opacity: .25; } }
+
+/* Refresh: the current data stays put, dimmed and inert, until the new data replaces it. */
+#hero, #picks, #content { transition: opacity .25s; }
+#app.refreshing :is(#hero, #picks, #content) { opacity: .4; pointer-events: none; }
+
+/* First load: placeholder blocks shaped like the hero and the ranked list. */
+/* Sized from the real hero (same padding and gap, number line height, facts block, stats strip). */
+.skel-hero { padding: 56px var(--gutter) 44px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 22px; }
+.skel-hero i, .skel-row i { display: block; background: var(--surface); border-radius: 8px; animation: pulse 1.2s ease-in-out infinite alternate; }
+.skel-hero i:nth-child(1) { width: 240px; height: 16px; }
+.skel-hero i:nth-child(2) { width: min(520px, 90%); height: calc(clamp(120px, 15vw, 220px) * .78); border-radius: 14px; }
+.skel-hero i:nth-child(3) { width: min(640px, 100%); height: 59px; }
+.skel-hero i:nth-child(4) { width: min(640px, 100%); height: 76px; border-radius: 14px; }
+.skel-row { display: grid; grid-template-columns: 40px 34px minmax(0, 1fr) 64px; gap: 16px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.skel-row > i:nth-child(1) { width: 18px; height: 12px; }
+.skel-row > i:nth-child(2) { width: 16px; height: 16px; border-radius: 3px; }
+.skel-row span { display: flex; flex-direction: column; gap: 8px; }
+.skel-row span i:first-child { width: 55%; height: 26px; }
+.skel-row span i:last-child { width: 80%; height: 11px; }
+.skel-row > i:nth-child(4) { height: 44px; }
+
 /* ---------- layout: content left, sticky map right ---------- */
 #app {
   display: grid;
@@ -527,6 +567,10 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
   .share { margin-left: 0; padding: 9px 12px; font-size: 13px; }
   .row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; padding: 14px 0; }
   .row .rank { display: none; }
+  .skel-row { grid-template-columns: 26px minmax(0, 1fr) 52px; gap: 12px; }
+  .skel-row > i:nth-child(1) { display: none; }
+  .skel-hero { margin: 16px var(--gutter); padding: 22px 20px; border: 1px solid var(--line); border-radius: 22px; }
+  .skel-hero i:nth-child(2) { height: 110px; }
   .detail { padding-left: 0; }
   .name { font-size: 24px; }
   .amt { font-size: 40px; }
@@ -543,4 +587,5 @@ td small { color: var(--muted); font-family: var(--mono); font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+  body.busy .bar::after { width: 100%; transform: none; opacity: .6; }   /* still say "loading", without motion */
 }

@@ -103,7 +103,13 @@ function render() {
     $("#content").innerHTML = V.note(`Couldn’t load forecasts: ${state.error}. Check your connection and press Refresh.`, true);
     return;
   }
-  if (!state.ready) return void ($("#content").innerHTML = V.note(`Loading forecasts for ${resorts.length} resorts…`));
+  if (!state.ready) {
+    // First load: placeholder blocks in the shape of the page, so nothing jumps when data lands.
+    const sk = V.skeletonHtml(state.view, resorts.length);
+    $("#hero").innerHTML = sk.hero;
+    $("#content").innerHTML = sk.content;
+    return;
+  }
 
   if (state.view === "check") renderCheck();
   else map?.setMarkers(state.view === "now" ? renderNow() : renderWeekend(), state.stats, state.active);
@@ -143,10 +149,14 @@ function select(id, fly) {
   map?.focus(id, fly);
 }
 
+const clock = t => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+// busy: disables Refresh, pulses the status dot and runs the progress bar under the header.
 function setStatus(text, busy) {
   $("#refresh").disabled = busy;
+  document.body.classList.toggle("busy", busy);
   if (text) return void ($("#status").textContent = text);
-  const t = new Date(state.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const t = clock(state.updated);
   const n = resorts.filter(r => r.obs).length;
   const snotel = state.snotel === "ok" ? `${n} SNOTEL` : state.snotel === "pending" ? "SNOTEL loading" : "SNOTEL offline";
   $("#status").textContent = `Updated ${t} · ${snotel}`;
@@ -154,29 +164,39 @@ function setStatus(text, busy) {
 
 /* ---------- loading ---------- */
 
+// First load shows placeholders. A refresh keeps the current data on screen, dimmed, until the new
+// data is in, and if it fails the old data stays.
 async function loadAll(force) {
-  Object.assign(state, { ready: false, error: null, snotel: "pending" });
-  setStatus("Loading…", true);
-  render();
+  const refreshing = state.ready;
+  state.error = null;
+  if (!refreshing) Object.assign(state, { snotel: "pending" });
+  $("#app").classList.toggle("refreshing", refreshing);
+  setStatus(refreshing ? "Refreshing…" : "Loading…", true);
+  if (!refreshing) render();
   try {
     state.updated = await loadForecasts(resorts, DATA_VERSION, force);
   } catch (e) {
-    state.error = e.name === "TimeoutError" ? "the forecast service timed out" : e.message;
+    const why = e.name === "TimeoutError" ? "the forecast service timed out" : e.message;
+    $("#app").classList.remove("refreshing");
+    if (refreshing) return setStatus(`Refresh failed · showing ${clock(state.updated)} data`, false);
+    state.error = why;
     setStatus("Forecast failed", false);
     render();
     return;
   }
   state.ready = true;
+  $("#app").classList.remove("refreshing");
   render();
-  if (filtered()) map?.fit(visible().map(r => r.id));
-  setStatus(null, false);
+  if (!refreshing && filtered()) map?.fit(visible().map(r => r.id));
+  setStatus(null, true);   // forecasts are in; SNOTEL is still loading
   try {
     matchStations(resorts, await loadStations());
     await loadObservations(resorts);
     state.snotel = "ok";
   } catch (e) {
     console.warn("SNOTEL unavailable:", e);
-    state.snotel = "unavailable";
+    // On a refresh, keep the last good observations rather than blanking Model check.
+    if (state.snotel !== "ok") state.snotel = "unavailable";
   }
   setStatus(null, false);
   render();

@@ -100,10 +100,12 @@ export async function loadForecasts(resorts, version, force) {
   const CHUNK = 30;   // locations per request
   const parts = [];
   for (let i = 0; i < resorts.length; i += CHUNK) parts.push(resorts.slice(i, i + CHUNK));
-  await Promise.all(parts.map(async part => {
+  const results = await Promise.all(parts.map(async part => {
     const json = await getJSON(forecastUrl(part), "Open-Meteo");
-    (Array.isArray(json) ? json : [json]).forEach((loc, j) => { part[j].days = parseDaily(loc.daily); });
+    return (Array.isArray(json) ? json : [json]).map(loc => parseDaily(loc.daily));
   }));
+  // Only touch the resorts once every request has succeeded, so a failed refresh leaves the old data whole.
+  results.flat().forEach((days, i) => { resorts[i].days = days; });
   cacheSet(key, resorts.map(r => r.days));
   return Date.now();
 }

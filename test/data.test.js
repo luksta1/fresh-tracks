@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { FUTURE, MODELS, PAST, TODAY } from "../js/config.js";
-import { buildResorts, cacheGet, cacheSet, depthByStation, forecastUrl, matchStations, parseDaily } from "../js/data.js";
+import { buildResorts, cacheGet, cacheSet, depthByStation, forecastUrl, loadForecasts, matchStations, parseDaily } from "../js/data.js";
 import { snowGain } from "../js/score.js";
 
 const fixture = name => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url)));
@@ -109,5 +109,33 @@ test("cache: versions of the same kind replace each other", () => {
     assert.equal(cacheGet("missing", 60000), null);
   } finally {
     delete globalThis.localStorage;
+  }
+});
+
+test("loadForecasts: all-or-nothing, so a failed refresh keeps the old data", async () => {
+  const rows = Array.from({ length: 45 }, (_, i) => [`R${i}`, "UT", "Utah", 40, -111 + i / 100, 2000, 3000]);
+  const resorts = buildResorts(rows, {});
+  const old = [{ date: "old", snow: 1 }];
+  resorts.forEach(r => { r.days = old; });
+  const loc = fixture("open-meteo.json")[0];
+  const realFetch = globalThis.fetch;
+  try {
+    // 45 resorts = two requests (30 + 15). The second one fails.
+    let calls = 0;
+    globalThis.fetch = async url => {
+      const n = new URL(url).searchParams.get("latitude").split(",").length;
+      return ++calls === 2 ? { ok: false, status: 503 } : { ok: true, json: async () => Array(n).fill(loc) };
+    };
+    await assert.rejects(loadForecasts(resorts, "test", true), /Open-Meteo returned 503/);
+    assert.ok(resorts.every(r => r.days === old), "no resort got half-new data");
+
+    globalThis.fetch = async url => {
+      const n = new URL(url).searchParams.get("latitude").split(",").length;
+      return { ok: true, json: async () => Array(n).fill(loc) };
+    };
+    await loadForecasts(resorts, "test", true);
+    assert.ok(resorts.every(r => r.days.length === PAST + FUTURE), "every resort updated");
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });

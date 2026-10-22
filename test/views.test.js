@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TODAY } from "../js/config.js";
-import { checkHtml, controlsHtml, dayStripHtml, heroHtml, mountainHtml, nowListHtml, passPill, popupHtml, weekendHtml } from "../js/views.js";
+import { checkHtml, controlsHtml, dayStripHtml, heroHtml, mountainHtml, nowListHtml, passPill, popupHtml, skeletonHtml, weekendHtml } from "../js/views.js";
 
 const resort = (over = {}) => ({
   id: 0, name: "Big Sky", st: "MT", region: "N. Rockies", pass: "ikon", base: 2077, summit: 3402,
@@ -101,4 +101,12 @@ test("dayStripHtml: past 3 days, today, next 6, one scale, scored days lit", () 
   assert.ok(!cells[5].includes('class="alt"'), "no ECMWF bar when it's missing");
   assert.match(html, /18–30°/);
   assert.match(dayStripHtml(resort(), []), /height:50%/, "small days still use a 4 in floor so 2 in isn't a full bar");
+});
+
+test("skeletonHtml: placeholder hero and rows, hidden from screen readers but announced", () => {
+  const sk = skeletonHtml("now", 67);
+  assert.match(sk.hero, /class="skel-hero" aria-hidden="true"/);
+  assert.equal((sk.content.match(/class="skel-row"/g) || []).length, 8);
+  assert.match(sk.content, /<p class="sr">Loading forecasts for 67 resorts…<\/p>/);
+  assert.equal(skeletonHtml("check", 67).hero, "");
 });

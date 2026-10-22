@@ -66,6 +66,15 @@ export const legendHtml = () => TIERS.slice().reverse().map(t =>
 
 export const note = (text, err) => `<p class="note${err ? " err" : ""}">${text}</p>`;
 
+// Placeholder blocks for the first load, shaped like the hero and the ranked list.
+export function skeletonHtml(view, count) {
+  const row = `<li class="skel-row"><i></i><i></i><span><i></i><i></i></span><i></i></li>`;
+  return {
+    hero: view === "check" ? "" : `<div class="skel-hero" aria-hidden="true"><i></i><i></i><i></i><i></i></div>`,
+    content: `<p class="sr">Loading forecasts for ${count} resorts…</p><ol class="list skel" aria-hidden="true">${row.repeat(8)}</ol>`
+  };
+}
+
 /* ---------- controls ---------- */
 
 export function controlsHtml(state, regions) {
