@@ -17,7 +17,7 @@ export function buildResorts(rows, meta, apres = {}) {
     return {
       id, name, st, region, lat, lon, base, summit, pass: pass || "none", passNote,
       meta: m,         // {lifts, mix: {green, blue, black, double} as % of trail length, runKm, url}
-      apres: apres[name] || [],   // [[name, where, note?]]
+      apres: apres[name] || [],   // [[name, where?, note?]]
       qElev: Math.round(base + 0.7 * (summit - base)),   // forecast point, 70% of the way up
       midElev: base + 0.55 * (summit - base),            // for matching SNOTEL stations
       us: US.has(st),

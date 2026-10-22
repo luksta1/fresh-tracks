@@ -58,6 +58,10 @@ test("trails/: one valid file per resort, nothing extra", () => {
   }
 });
 
+test("apres.js: every resort has picks", () => {
+  for (const [name] of RESORTS) assert.ok(APRES[name]?.length, `${name} has no après picks`);
+});
+
 test("apres.js: keyed by real resorts, up to three well-formed picks each", () => {
   const names = new Set(RESORTS.map(r => r[0]));
   for (const [resort, picks] of Object.entries(APRES)) {
@@ -65,7 +69,7 @@ test("apres.js: keyed by real resorts, up to three well-formed picks each", () =
     assert.ok(Array.isArray(picks) && picks.length >= 1 && picks.length <= 3, `${resort}: 1 to 3 picks`);
     for (const [name, where, note] of picks) {
       assert.ok(typeof name === "string" && name.trim(), `${resort}: pick needs a name`);
-      assert.ok(typeof where === "string" && where.trim(), `${resort} / ${name}: needs a where`);
+      assert.ok(where === undefined || (typeof where === "string" && where.trim()), `${resort} / ${name}: where is optional but can't be blank`);
       assert.ok(note === undefined || typeof note === "string");
     }
   }

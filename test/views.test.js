@@ -141,4 +141,7 @@ test("popupHtml: après picks with escaped names and Maps links", () => {
   const many = resort({ apres: [["A", "x"], ["B", "x"], ["C", "x"], ["D", "x"]] });
   assert.equal((popupHtml(many, st(), false).match(/<li>/g) || []).length, 3, "three at most");
   assert.match(popupHtml(resort({ apres: [] }), st(), false), /No picks yet/);
+  const bare = popupHtml(resort({ apres: [["Scissorbills Saloon"]] }), st(), false);
+  assert.match(bare, /query=Scissorbills%20Saloon%2C%20Big%20Sky%2C%20MT"/, "no where: search by resort and state");
+  assert.ok(!/<small>/.test(bare.split('class="pop-apres"')[1]), "no empty detail line");
 });

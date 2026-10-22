@@ -1,60 +1,77 @@
 /*
   Après picks: up to three per resort, shown in the resort's map popup.
-  Keyed by resort name in resorts.js. Each pick: [name, where, note?]
-    where: the base area or town, also used to find the bar on Google Maps
+  Keyed by resort name in resorts.js. Each pick: [name, where?, note?]
+    where: optional base area or town, shown under the name and used to find the bar on Google Maps
+           (without it, the search uses the resort name and state)
     note:  optional, one short line in your own words ("rope tow to the patio", "3:30 or no table")
-  First draft written from memory in Oct 2026, limited to long-running spots. Places close and
-  change hands, so check before you trust it, and add your own. Resorts left out show no picks.
+  From the list compiled in Oct 2026. Places close and change hands, so check each season.
 */
 export const APRES = {
-  // Colorado
-  "Vail": [["The Red Lion", "Vail Village"], ["Pepi's Bar", "Vail Village"], ["Garfinkel's", "Lionshead"]],
-  "Aspen Snowmass": [["Ajax Tavern", "Aspen Mountain base"], ["Cloud Nine Alpine Bistro", "Aspen Highlands, on mountain"]],
-  "Telluride": [["The Last Dollar Saloon", "Telluride"]],
+  "Aspen Snowmass": [["Cloud Nine Alpine Bistro", "Aspen Highlands, on mountain"], ["Ajax Tavern", "Aspen Mountain base"], ["Venga Venga"]],
+  "Vail": [["The Red Lion", "Vail Village"], ["Garfinkel's", "Lionshead"], ["Pepi's Bar", "Vail Village"]],
+  "Breckenridge": [["T-Bar"], ["Robbie's Tavern"], ["RMU Tavern"]],
+  "Telluride": [["Gorrono Ranch"], ["Allred's"], ["The Last Dollar Saloon", "Telluride"]],
+  "Winter Park": [["Derailer Bar"], ["Vertical Bistro & Tap"], ["Deno's Mountain Bistro"]],
+  "Steamboat": [["T Bar"], ["Slopeside Grill"], ["Timber & Torch"]],
   "Arapahoe Basin": [["6th Alley Bar & Grill", "A-Basin base"]],
-  "Crested Butte": [["Eldo Brewery", "Crested Butte"]],
-
-  // Utah
-  "Alta": [["Goldminer's Daughter", "Alta"]],
-  "Snowbird": [["The Tram Club", "Snowbird Center"]],
+  "Loveland": [["The Rathskeller"], ["Loveland Wedge Bar"]],
+  "Copper Mountain": [["Duke's on the River"], ["Endo's Adrenaline Cafe"], ["JJ's Rocky Mountain Tavern"]],
+  "Crested Butte": [["The Avalanche Bar & Grill"], ["Secret Stash"], ["The Eldo", "Crested Butte"]],
+  "Wolf Creek": [["Riff Raff Brewing Company"], ["Kip's Grill"]],
+  "Alta": [["Goldminer's Saloon"], ["Sitzmark Club"], ["The Peruvian Bar"]],
+  "Snowbird": [["The Tram Club", "Snowbird Center"], ["The Aerie Lounge"]],
   "Brighton": [["Molly Green's", "Brighton base"]],
-  "Solitude": [["Thirsty Squirrel", "Solitude Village"]],
-  "Park City": [["No Name Saloon", "Main Street, Park City"], ["High West Saloon", "Park City"], ["Wasatch Brew Pub", "Main Street, Park City"]],
-
-  // Northern Rockies
-  "Jackson Hole": [["Mangy Moose", "Teton Village"]],
+  "Solitude": [["Thirsty Squirrel", "Solitude Village"], ["Argenta Pub"]],
+  "Park City": [["High West Saloon", "Park City"], ["No Name Saloon", "Main Street, Park City"], ["The Spur Bar & Grill"]],
+  "Deer Valley": [["The Après Lounge"], ["The Brass Tag"]],
+  "Powder Mountain": [["Powder Keg"], ["Shooting Star Saloon"]],
+  "Snowbasin": [["Cinnabar"], ["Shooting Star Saloon"]],
+  "Jackson Hole": [["Mangy Moose Saloon", "Teton Village"], ["Tram Dock"], ["The Handle Bar"]],
   "Grand Targhee": [["Trap Bar & Grill", "Grand Targhee base"]],
-  "Sun Valley": [["Apples Bar & Grill", "River Run base"], ["Pioneer Saloon", "Ketchum"]],
-
-  // Southwest
-  "Taos": [["The Martini Tree Bar", "Taos Ski Valley"], ["The Bavarian", "Taos Ski Valley, on mountain"]],
-
-  // Sierra
-  "Palisades Tahoe": [["Le Chamois & Loft Bar", "Olympic Valley base"]],
-  "Mammoth": [["Lakanuki", "The Village at Mammoth"], ["Mammoth Brewing Co.", "Mammoth Lakes"]],
-
-  // Pacific Northwest
-  "Crystal Mountain": [["Snorting Elk Cellar", "Crystal Mountain base"]],
-
-  // Alaska
-  "Alyeska": [["Sitzmark Bar & Grill", "Girdwood"]],
-
-  // Northeast
-  "Stowe": [["The Matterhorn", "Mountain Road, Stowe"]],
-  "Killington": [["Wobbly Barn", "Killington Road"], ["Pickle Barrel", "Killington Road"]],
-  "Sugarbush": [["Castlerock Pub", "Lincoln Peak base"]],
-  "Sugarloaf": [["The Bag & Kettle", "Sugarloaf village"], ["Widowmaker Lounge", "Sugarloaf base lodge"]],
-  "Sunday River": [["Foggy Goggle", "South Ridge base"]],
-  "Jay Peak": [["The Tower Bar", "Jay Peak base"]],
-
-  // BC and Alberta
-  "Whistler Blackcomb": [["Garibaldi Lift Co.", "Whistler Village"], ["Merlin's Bar & Grill", "Blackcomb base"], ["Dusty's", "Creekside"]],
-  "Fernie": [["The Griz Bar", "Fernie Alpine Resort"]],
-  "Red Mountain": [["Rafters", "Red Mountain base"]],
-  "Whitewater": [["Coal Oil Johnny's Pub", "Whitewater lodge"]],
-  "Big White": [["Snowshoe Sam's", "Big White village"]],
-  "Sunshine Village": [["Mad Trapper's Saloon", "Sunshine Village"]],
-
-  // Quebec
-  "Mont Tremblant": [["Le P'tit Caribou", "Tremblant village"]]
+  "Big Sky": [["Scissorbills Saloon"], ["Umbrella Bar"], ["Montana Jack"]],
+  "Bridger Bowl": [["Grizzly Ridge"], ["Bridger Brewing"]],
+  "Whitefish": [["Bierstube"], ["Hellroaring Saloon"], ["The Great Northern Bar"]],
+  "Sun Valley": [["Apple's Bar & Grill"], ["River Run Lodge"], ["Grumpy's"]],
+  "Schweitzer": [["Taps Bar"]],
+  "Brundage": [["Smoky's Bar & Grill"], ["Upper Lot Pub"]],
+  "Bogus Basin": [["Double R Ranch BBQ"], ["Bittercreek Alehouse"]],
+  "Taos": [["The Martini Tree", "Taos Ski Valley"], ["The Bavarian", "Taos Ski Valley, on mountain"]],
+  "Arizona Snowbowl": [["Agassiz Lodge Bar"], ["Mother Road Brewing Company"]],
+  "Palisades Tahoe": [["Le Chamois", "Olympic Valley base"], ["KT Base Bar"], ["The Slot Bar"]],
+  "Northstar": [["The Overlook"], ["Bourbon Pub"]],
+  "Heavenly": [["Tamarack Lodge"], ["McP's Taphouse"], ["Basecamp Pizza"]],
+  "Kirkwood": [["The Cornice"], ["K-Bar"]],
+  "Sugar Bowl": [["Belt Room Bar"], ["Judah Lodge"]],
+  "Mt. Rose": [["Timbers Bar"], ["Inclined Burgers and Brews"]],
+  "Mammoth": [["The Yodler"], ["Tusks Bar"], ["Clocktower Cellar"]],
+  "Mt. Bachelor": [["Clearing Rock Bar"], ["10 Barrel Brewing"]],
+  "Mt. Hood Meadows": [["Vertical Restaurant & Sports Bar"], ["pFriem Family Brewers"]],
+  "Crystal Mountain": [["Snorting Elk Cellar", "Crystal Mountain base"], ["Fireside Cantina"]],
+  "Stevens Pass": [["Foggy Goggle"], ["The Whistling Post"]],
+  "Mt. Baker": [["Chair 9 Woodstone Pizza & Bar"], ["North Fork Brewery"]],
+  "Alyeska": [["Sitzmark Bar & Grill", "Girdwood"], ["Chair 5 Restaurant"]],
+  "Stowe": [["The Matterhorn", "Mountain Road, Stowe"], ["WhistlePig Pavilion"], ["Doc Ponds"]],
+  "Jay Peak": [["Bullwheel Bar"], ["Tower Bar", "Jay Peak base"]],
+  "Killington": [["The Wobbly Barn", "Killington Road"], ["Lookout Tavern"], ["The Pickle Barrel", "Killington Road"]],
+  "Sugarbush": [["Rumble's Bistro & Bar"], ["The Wunderbar"], ["Castlerock Pub", "Lincoln Peak base"]],
+  "Loon Mountain": [["Paul Bunyan Room"], ["One Love Brewery"]],
+  "Sugarloaf": [["Widowmaker", "Sugarloaf base lodge"], ["The Bag & Kettle", "Sugarloaf village"]],
+  "Sunday River": [["Foggy Goggle", "South Ridge base"], ["Matterhorn Ski Bar"]],
+  "Whiteface": [["Cloudspin Bar & Grill"], ["Lake Placid Pub & Brewery"], ["Smoke Signals"]],
+  "Whistler Blackcomb": [["Longhorn Saloon"], ["Garibaldi Lift Co. (GLC)", "Whistler Village"], ["Merlin's Bar & Grill", "Blackcomb base"]],
+  "Cypress": [["Crazy Raven Bar & Grill"]],
+  "Mt. Washington": [["Ted's Bar & Grill"], ["Buck's Bar"]],
+  "Revelstoke": [["Rockford Bar & Grill"], ["Mackenzie Common Tavern"], ["The Village Idiot"]],
+  "Kicking Horse": [["Whitetooth Mountain Bistro"], ["Peaks Grill"], ["The Wolf's Den"]],
+  "Fernie": [["The Griz Bar", "Fernie Alpine Resort"], ["The Brickhouse"], ["Northern Bar & Stage"]],
+  "Red Mountain": [["Rafters Lounge", "Red Mountain base"], ["The Flying Steamshovel"]],
+  "Whitewater": [["Coal Oil Johnny's Pub", "Whitewater lodge"], ["Mike's Place Pub"], ["The Royal"]],
+  "Sun Peaks": [["Bottoms Bar & Grill"], ["Masa's Bar & Grill"], ["Morrisey's Public House"]],
+  "Big White": [["Snowshoe Sam's", "Big White village"], ["Sessions Taphouse & Grill"], ["The BullWheel"]],
+  "Panorama": [["T-Bar & Grill"], ["Jackpine Pub"]],
+  "Lake Louise": [["Kokanee Kabin"], ["Powder Keg Lounge"], ["Bill Peyto's Cafe"]],
+  "Sunshine Village": [["Mad Trapper's Saloon", "Sunshine Village"], ["Chimney Corner"], ["Creekside Restaurant"]],
+  "Marmot Basin": [["Caribou Chalet"], ["Jasper Brewing Co."]],
+  "Mont Tremblant": [["Le P'tit Caribou", "Tremblant village"], ["La Forge Bistro-Bar"], ["Le Shack"]],
+  "Le Massif": [["Pub Le Grand Duc"]]
 };

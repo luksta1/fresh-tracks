@@ -270,11 +270,15 @@ export function popupHtml(r, s, showObs) {
 export const mapsLink = (name, where) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${where}`)}`;
 
-// Après picks from apres.js, which people edit by hand, so everything is escaped.
+// Après picks from apres.js, which people edit by hand, so everything is escaped. Without a
+// "where", the Maps search uses the resort and state.
 function apresHtml(r) {
   if (!r.apres?.length) return `<div class="pop-apres"><div class="pop-label">Après</div><p class="pop-none">No picks yet. Add some in apres.js.</p></div>`;
-  return `<div class="pop-apres"><div class="pop-label">Après</div><ol>${r.apres.slice(0, 3).map(([name, where, note]) => `<li>
-      <a href="${mapsLink(name, where)}" target="_blank" rel="noopener">${esc(name)}</a>
-      <small>${esc(where)}${note ? ` · ${esc(note)}` : ""}</small>
-    </li>`).join("")}</ol></div>`;
+  return `<div class="pop-apres"><div class="pop-label">Après</div><ol>${r.apres.slice(0, 3).map(([name, where, note]) => {
+    const detail = [where, note].filter(Boolean).map(esc).join(" · ");
+    return `<li>
+      <a href="${mapsLink(name, where || `${r.name}, ${r.st}`)}" target="_blank" rel="noopener">${esc(name)}</a>${detail ? `
+      <small>${detail}</small>` : ""}
+    </li>`;
+  }).join("")}</ol></div>`;
 }
