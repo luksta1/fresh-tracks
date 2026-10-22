@@ -9,9 +9,10 @@
 */
 import fs from "node:fs";
 import path from "node:path";
-import vm from "node:vm";
 import readline from "node:readline";
 import { Readable } from "node:stream";
+import { RESORT_META } from "../resort-meta.js";
+import { slug } from "../js/util.js";   // the app fetches trails/<slug>.json with the same function
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const OUT = path.join(ROOT, "trails");
@@ -22,18 +23,8 @@ const SOURCES = {
 const TOLERANCE = 0.00004;   // degrees (~4 m): Douglas-Peucker simplification
 const PRECISION = 1e5;       // 5 decimals (~1 m)
 
-// Must match trailSlug() in app.js.
-export const slug = name => name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-  .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
 // OpenSkiMap difficulty -> trail sign, as in enrich-resorts.mjs. Unrated runs are drawn faintly.
 const SIGN = { novice: "g", easy: "g", intermediate: "b", advanced: "k", expert: "d", freeride: "d", extreme: "d" };
-
-function loadMeta() {
-  const sandbox = { window: {} };
-  vm.runInNewContext(fs.readFileSync(path.join(ROOT, "resort-meta.js"), "utf8"), sandbox);
-  return sandbox.window.RESORT_META;
-}
 
 async function lines(source) {
   let stream;
@@ -79,7 +70,7 @@ function paths(geometry) {
   }
 }
 
-const meta = loadMeta();
+const meta = RESORT_META;
 const owner = new Map();   // OpenSkiMap ski area id -> resort name
 for (const [name, m] of Object.entries(meta)) for (const id of m.osm) owner.set(id, name);
 const out = Object.fromEntries(Object.keys(meta).map(name => [name, { runs: [], lifts: [] }]));

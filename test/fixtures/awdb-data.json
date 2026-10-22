@@ -1,0 +1,82 @@
+[
+ {
+  "stationTriplet": "766:UT:SNTL",
+  "data": [
+   {
+    "stationElement": {
+     "elementCode": "SNWD",
+     "ordinal": 1,
+     "durationName": "DAILY",
+     "dataPrecision": 0,
+     "storedUnitCode": "in",
+     "originalUnitCode": "in",
+     "beginDate": "2002-07-31 06:00",
+     "endDate": "2100-01-01 00:00",
+     "derivedData": false
+    },
+    "values": [
+     {
+      "date": "2026-10-17",
+      "value": 2
+     },
+     {
+      "date": "2026-10-18",
+      "value": 1
+     },
+     {
+      "date": "2026-10-19",
+      "value": 0
+     },
+     {
+      "date": "2026-10-20",
+      "value": 0
+     },
+     {
+      "date": "2026-10-21",
+      "value": 0
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "stationTriplet": "590:MT:SNTL",
+  "data": [
+   {
+    "stationElement": {
+     "elementCode": "SNWD",
+     "ordinal": 1,
+     "durationName": "DAILY",
+     "dataPrecision": 0,
+     "storedUnitCode": "in",
+     "originalUnitCode": "in",
+     "beginDate": "2002-07-31 13:00",
+     "endDate": "2100-01-01 00:00",
+     "derivedData": false
+    },
+    "values": [
+     {
+      "date": "2026-10-17",
+      "value": 1
+     },
+     {
+      "date": "2026-10-18",
+      "value": 0
+     },
+     {
+      "date": "2026-10-19",
+      "value": 0
+     },
+     {
+      "date": "2026-10-20",
+      "value": 0
+     },
+     {
+      "date": "2026-10-21",
+      "value": 0
+     }
+    ]
+   }
+  ]
+ }
+]

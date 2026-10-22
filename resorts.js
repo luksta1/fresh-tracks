@@ -7,7 +7,7 @@
   Forecasts are pulled for a point about 70% of the way from base to summit.
   Coordinates and elevations are approximate; fine for 10 km weather grids.
 */
-window.RESORTS = [
+export const RESORTS = [
   // Colorado
   ["Aspen Snowmass", "CO", "Colorado", 39.2084, -106.9490, 2400, 3813, "ikon"],
   ["Vail", "CO", "Colorado", 39.6061, -106.3550, 2475, 3527, "epic"],

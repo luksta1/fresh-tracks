@@ -1,6 +1,7 @@
 # Fresh Tracks
 
-A personal powder tracker for ~70 North American ski resorts. No build step, no server code.
+A personal powder tracker for 67 North American ski resorts. Static site: no build step, no
+server code, no dependencies.
 
 - **Right now**: ranked list and map by powder score (past 3 days, next 3 days, next 7 days)
 - **This weekend**: top 3 picks for Fri/Sat/Sun with a plain-English reason
@@ -19,9 +20,34 @@ so there's no tile key to manage.
 
 ## Run locally
 
-    python3 -m http.server 8000      # or: npx serve .
+    npm run serve        # python3 -m http.server 8000, or any static server
 
-Then open http://localhost:8000. Both APIs allow cross-origin requests, so no proxy is needed.
+Then open http://localhost:8000. The app is ES modules, so it needs a server; opening
+`index.html` from disk won't work. Both APIs allow cross-origin requests, so no proxy is needed.
+
+## Test
+
+    npm test             # node --test, Node 20+, no installs
+
+Covers scoring, the weekend and SNOTEL math, URL hashes, the HTML views (including escaping of
+outside text), parsing against saved real API responses in `test/fixtures/`, and the committed
+data: every resort well-formed, matched in `resort-meta.js`, and with a trails file near it.
+
+## Layout
+
+| File | What it does |
+| --- | --- |
+| `index.html` | Page shell; loads Leaflet from a CDN, then `js/main.js` |
+| `styles.css` | The whole look |
+| `resorts.js` | Hand-edited resort list |
+| `resort-meta.js`, `trails/` | Generated from OpenSkiMap by `scripts/` |
+| `js/main.js` | State, rendering, events, startup |
+| `js/data.js` | Resort setup, Open-Meteo and SNOTEL loading, local cache |
+| `js/score.js` | Powder score, tiers, model confidence, weekend days, SNOTEL gains (pure) |
+| `js/views.js` | HTML for each view (pure) |
+| `js/map.js` | Leaflet map, markers, popups, trails |
+| `js/url.js` | Shareable URL hash |
+| `js/config.js`, `js/util.js` | Constants; small helpers shared with `scripts/` |
 
 ## Deploy
 
@@ -33,15 +59,14 @@ Any static host works. On Netlify, `netlify.toml` sets the publish directory to 
 
 - `resorts.js`: add or remove resorts (name, state, region, lat, lon, base m, summit m, pass). Pass is `ikon`, `epic`, `epic-limited` (with a note like "7 days"), or `none`. Tags match the 2026/27 pass lists; recheck each fall. Editing this file invalidates the forecast cache automatically.
 - `resort-meta.js`: generated, don't edit. After changing `resorts.js` (and once a season), run
-  `node scripts/enrich-resorts.mjs` to refresh it. It prints each match so you can spot a wrong one;
+  `npm run enrich` to refresh it. It prints each match so you can spot a wrong one;
   fix those with `OVERRIDES` at the top of the script.
 - `trails/`: generated, don't edit. One file per resort with its runs and lifts, drawn on the map
   from zoom 11 in (picking a resort flies there). Rebuild after refreshing `resort-meta.js`:
-  `node scripts/build-trails.mjs` (streams OpenSkiMap's runs and lifts files, about 10 seconds).
-- `app.js`, `MODELS`: the main forecast model and the second opinion (any Open-Meteo model ids).
-- `app.js`, `dayScore()`: tune the powder score weights.
-- `app.js`, `confidence()`: tune when models count as agreeing.
-- `app.js`, `weekendIdx()` and the weights in `renderWeekend()`: change how the weekend is scored.
+  `npm run trails` (streams OpenSkiMap's runs and lifts files, about 10 seconds). Then `npm test`.
+- `js/config.js`, `MODELS`: the main forecast model and the second opinion (any Open-Meteo model ids).
+- `js/config.js`, `WEEKEND_WEIGHTS`, and `js/score.js`, `weekendIdx()`: how the weekend is scored.
+- `js/score.js`, `dayScore()`: the powder score weights. `confidence()`: when models count as agreeing.
 
 ## Data
 

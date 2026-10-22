@@ -1,0 +1,13 @@
+{
+  "name": "fresh-tracks",
+  "private": true,
+  "description": "Powder tracker for North American ski resorts. Static site, no build step, no dependencies.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8000",
+    "enrich": "node scripts/enrich-resorts.mjs",
+    "trails": "node scripts/build-trails.mjs"
+  }
+}
